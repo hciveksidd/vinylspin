@@ -106,22 +106,18 @@ export class AudioEngine {
     return this.streamDestination;
   }
 
+  // Reused every frame to avoid allocating in the render loop; callers must not keep references
+  private freqBuffer = new Uint8Array(128);
+  private waveBuffer = new Uint8Array(128);
+
   public getFrequencyData(): Uint8Array {
-    if (!this.analyser) {
-      return new Uint8Array(64);
-    }
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-    return dataArray;
+    if (this.analyser) this.analyser.getByteFrequencyData(this.freqBuffer);
+    return this.freqBuffer;
   }
 
   public getWaveformData(): Uint8Array {
-    if (!this.analyser) {
-      return new Uint8Array(64);
-    }
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteTimeDomainData(dataArray);
-    return dataArray;
+    if (this.analyser) this.analyser.getByteTimeDomainData(this.waveBuffer);
+    return this.waveBuffer;
   }
 
   public getBassEnergy(): number {

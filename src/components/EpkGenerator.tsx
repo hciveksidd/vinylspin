@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FileText,
   Play,
   Pause,
   ExternalLink,
-  Copy,
+  Download,
   Check,
   Upload,
   Music,
@@ -22,6 +22,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { EPKData } from '../types';
+import { buildStandaloneHtml } from '../utils/epkExport';
+import { downloadBlob } from '../utils/videoExporter';
 
 const DEFAULT_EPK: EPKData = {
   artistName: 'Kallisto Sound',
@@ -80,13 +82,26 @@ const DEFAULT_EPK: EPKData = {
 export const EpkGenerator: React.FC = () => {
   const [epk, setEpk] = useState<EPKData>(DEFAULT_EPK);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('preview');
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [playingTrackIndex, setPlayingTrackIndex] = useState<number | null>(null);
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://spinningvinyl.app/epk/${epk.artistName.toLowerCase().replace(/\s+/g, '-')}`);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  // The preview has to be on screen to be serialized, so switch to it first and export after render
+  useEffect(() => {
+    if (!pendingDownload || activeTab !== 'preview' || !previewRef.current) return;
+    setPendingDownload(false);
+    const html = buildStandaloneHtml(previewRef.current, `${epk.artistName} — Electronic Press Kit`);
+    const slug = epk.artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'artist';
+    downloadBlob(new Blob([html], { type: 'text/html' }), `${slug}-epk.html`);
+    setDownloaded(true);
+    const id = setTimeout(() => setDownloaded(false), 2000);
+    return () => clearTimeout(id);
+  }, [pendingDownload, activeTab, epk.artistName]);
+
+  const handleDownloadHtml = () => {
+    setActiveTab('preview');
+    setPendingDownload(true);
   };
 
   return (
@@ -102,10 +117,10 @@ export const EpkGenerator: React.FC = () => {
             <span>Electronic Press Kit Builder</span>
           </div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-white">
-            Artist EPK & Private Label Demo Links
+            Artist EPK Builder
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Pitch unreleased tracks to record labels, booking agents, and Spotify curators with a private electronic press kit.
+            Build an electronic press kit for labels, booking agents and curators, then download it as a single HTML page you can host anywhere.
           </p>
         </div>
 
@@ -131,18 +146,18 @@ export const EpkGenerator: React.FC = () => {
           </div>
 
           <button
-            onClick={handleCopyLink}
+            onClick={handleDownloadHtml}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors"
           >
-            {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            <span>{copiedLink ? 'Link Copied!' : 'Copy Private Link'}</span>
+            {downloaded ? <Check className="w-4 h-4 text-emerald-400" /> : <Download className="w-4 h-4" />}
+            <span>{downloaded ? 'Downloaded!' : 'Download HTML'}</span>
           </button>
         </div>
       </div>
 
       {/* Main Content: Edit vs Preview */}
       {activeTab === 'preview' ? (
-        <div className="bg-[#12151c] border border-white/10 rounded-2xl p-6 md:p-10 shadow-2xl relative overflow-hidden text-white">
+        <div ref={previewRef} className="bg-[#12151c] border border-white/10 rounded-2xl p-6 md:p-10 shadow-2xl relative overflow-hidden text-white">
           
           {/* Artist Hero */}
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-8 border-b border-white/10">

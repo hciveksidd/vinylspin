@@ -4,27 +4,27 @@
  */
 
 import React, { useState } from 'react';
-import { X, Mail, Send, Check } from 'lucide-react';
+import { X, Mail, Send } from 'lucide-react';
 
 interface ContactModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const ISSUES_URL = 'https://github.com/hciveksidd/vinylspin/issues';
+
 export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
-  const [submitted, setSubmitted] = useState(false);
-  const [email, setEmail] = useState('');
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
 
   if (!isOpen) return null;
 
+  // There is no backend, so feedback goes to the project's GitHub issue tracker, prefilled
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onClose();
-    }, 1800);
+    const params = new URLSearchParams({ title, body: message });
+    window.open(`${ISSUES_URL}/new?${params}`, '_blank', 'noopener');
+    onClose();
   };
 
   return (
@@ -44,29 +44,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             <Mail className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white">Contact & Label Support</h3>
-            <p className="text-xs text-zinc-400">We respond to all producer inquiries within 2 hours.</p>
+            <h3 className="text-xl font-bold text-white">Feedback & Support</h3>
+            <p className="text-xs text-zinc-400">Opens a prefilled issue on GitHub.</p>
           </div>
         </div>
 
-        {submitted ? (
-          <div className="py-8 text-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-              <Check className="w-6 h-6" />
-            </div>
-            <h4 className="text-sm font-bold text-white">Message Dispatched!</h4>
-            <p className="text-xs text-zinc-400">Our audio engineer team will email you back shortly.</p>
-          </div>
-        ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1">Your Email</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Subject</label>
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="producer@label.com"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Short summary"
                 className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -88,10 +79,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Send Message</span>
+              <span>Open on GitHub</span>
             </button>
           </form>
-        )}
       </div>
     </div>
   );

@@ -241,7 +241,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                   Press kit generator
                 </div>
                 <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                  Your EPK + private demo links to labels.
+                  Build your EPK and download it as a web page.
                 </div>
               </button>
             </div>
