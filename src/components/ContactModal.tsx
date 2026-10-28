@@ -78,7 +78,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Questions about bulk label licenses, custom Spotify canvas aspect ratios, or custom watermarks..."
+                placeholder="Feature requests, bug reports or questions about Spotify Canvas formats..."
                 className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
               />
             </div>

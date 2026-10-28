@@ -11,7 +11,6 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Crown,
   Upload,
   Music,
   Share2,
@@ -22,12 +21,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { EPKData, UserSubscription } from '../types';
-
-interface EpkGeneratorProps {
-  subscription: UserSubscription;
-  onOpenPricing: () => void;
-}
+import { EPKData } from '../types';
 
 const DEFAULT_EPK: EPKData = {
   artistName: 'Kallisto Sound',
@@ -83,11 +77,7 @@ const DEFAULT_EPK: EPKData = {
   ],
 };
 
-export const EpkGenerator: React.FC<EpkGeneratorProps> = ({
-  subscription,
-  onOpenPricing,
-}) => {
-  const isPro = subscription.status === 'active' && subscription.planId !== 'free';
+export const EpkGenerator: React.FC = () => {
   const [epk, setEpk] = useState<EPKData>(DEFAULT_EPK);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('preview');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -154,21 +144,6 @@ export const EpkGenerator: React.FC<EpkGeneratorProps> = ({
       {activeTab === 'preview' ? (
         <div className="bg-[#12151c] border border-white/10 rounded-2xl p-6 md:p-10 shadow-2xl relative overflow-hidden text-white">
           
-          {/* Pro watermark banner status */}
-          {!isPro && (
-            <div className="mb-8 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span>Free Plan: EPK displays "Powered by SpinningVinyl" badge.</span>
-              </div>
-              <button
-                onClick={onOpenPricing}
-                className="px-2.5 py-1 rounded bg-amber-400 text-black font-bold text-[11px] shrink-0"
-              >
-                Upgrade to White-Label Pro
-              </button>
-            </div>
-          )}
-
           {/* Artist Hero */}
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-8 border-b border-white/10">
             <div>
@@ -329,17 +304,13 @@ export const EpkGenerator: React.FC<EpkGeneratorProps> = ({
 
           </div>
 
-          {/* Footer watermark badge if free tier */}
+          {/* Footer credit */}
           <div className="mt-12 pt-6 border-t border-white/[0.08] flex items-center justify-between text-[11px] text-zinc-500">
             <div>© {new Date().getFullYear()} {epk.artistName} · All Rights Reserved</div>
-            {!isPro ? (
-              <div className="flex items-center gap-1.5 text-zinc-400">
-                <span>Created with</span>
-                <span className="font-bold text-amber-400">SpinningVinyl EPK Studio</span>
-              </div>
-            ) : (
-              <div className="text-zinc-600 font-mono">White-Label Verified</div>
-            )}
+            <div className="flex items-center gap-1.5 text-zinc-400">
+              <span>Created with</span>
+              <span className="font-bold text-amber-400">SpinningVinyl EPK Studio</span>
+            </div>
           </div>
 
         </div>

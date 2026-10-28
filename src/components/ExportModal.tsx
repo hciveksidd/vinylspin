@@ -9,23 +9,19 @@ import {
   X,
   Video,
   Image as ImageIcon,
-  Check,
-  Crown,
-  Sparkles,
   Loader2,
   FileCheck,
-  AlertCircle,
   Share2,
 } from 'lucide-react';
-import { UserSubscription, StudioToolId } from '../types';
+import { StudioToolId } from '../types';
 import { exportVideo, downloadBlob, downloadCanvasSnapshot } from '../utils/videoExporter';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  subscription: UserSubscription;
-  onOpenPricing: () => void;
+  showWatermark: boolean;
+  onToggleWatermark: (value: boolean) => void;
   toolId: StudioToolId;
   trackTitle: string;
 }
@@ -34,16 +30,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
   canvasRef,
-  subscription,
-  onOpenPricing,
+  showWatermark,
+  onToggleWatermark,
   toolId,
   trackTitle,
 }) => {
-  const isPro = subscription.status === 'active' && subscription.planId !== 'free';
-
   const [exportType, setExportType] = useState<'video' | 'canvas-loop' | 'snapshot'>('video');
   const [durationSeconds, setDurationSeconds] = useState<number>(toolId === 'spotify-canvas' ? 5 : 6);
-  const [fps, setFps] = useState<number>(isPro ? 60 : 30);
+  const [fps, setFps] = useState<number>(30);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [exportComplete, setExportComplete] = useState<boolean>(false);
@@ -56,7 +50,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
     if (exportType === 'snapshot') {
       const cleanTitle = (trackTitle || 'promo').toLowerCase().replace(/[^a-z0-9]/g, '-');
-      const filename = `${cleanTitle}-${isPro ? 'pro' : 'watermarked'}.png`;
+      const filename = `${cleanTitle}.png`;
       downloadCanvasSnapshot(canvas, filename);
       setExportComplete(true);
       return;
@@ -68,7 +62,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
     try {
       const cleanTitle = (trackTitle || 'spinningvinyl').toLowerCase().replace(/[^a-z0-9]/g, '-');
-      const filename = `${cleanTitle}-${toolId}-${isPro ? 'pro-clean' : 'free-watermarked'}.webm`;
+      const filename = `${cleanTitle}-${toolId}.webm`;
 
       const videoBlob = await exportVideo({
         canvas,
@@ -114,42 +108,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </div>
         </div>
 
-        {/* Watermark Status Alert Card */}
-        <div className={`p-3.5 rounded-xl border mb-6 flex items-start justify-between gap-3 ${
-          isPro
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-        }`}>
-          <div className="flex items-start gap-2.5">
-            {isPro ? (
-              <Crown className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            )}
-            <div>
-              <div className="text-xs font-bold">
-                {isPro ? 'Pro Subscription Active: Watermark Removed' : 'Free Mode: Watermark will be added'}
-              </div>
-              <div className="text-[11px] text-zinc-400 mt-0.5">
-                {isPro
-                  ? 'Your exported file will be 100% clean, pristine and watermark-free.'
-                  : 'Free tier exports include the SpinningVinyl watermark badge.'}
-              </div>
+        {/* Optional branding badge */}
+        <label className="p-3.5 rounded-xl border border-white/10 bg-white/[0.02] mb-6 flex items-center justify-between gap-3 cursor-pointer">
+          <div>
+            <div className="text-xs font-bold text-white">Add SpinningVinyl badge</div>
+            <div className="text-[11px] text-zinc-400 mt-0.5">
+              Optional credit stamped onto the exported visual.
             </div>
           </div>
-
-          {!isPro && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenPricing();
-              }}
-              className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-sm"
-            >
-              Remove Watermark
-            </button>
-          )}
-        </div>
+          <input
+            type="checkbox"
+            checked={showWatermark}
+            onChange={(e) => onToggleWatermark(e.target.checked)}
+            className="w-4 h-4 accent-amber-400 shrink-0"
+          />
+        </label>
 
         {/* Export Type Selection */}
         <div className="space-y-4 mb-6">
@@ -236,13 +209,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   30 FPS
                 </button>
                 <button
-                  onClick={() => {
-                    if (isPro) {
-                      setFps(60);
-                    } else {
-                      onOpenPricing();
-                    }
-                  }}
+                  onClick={() => setFps(60)}
                   className={`flex-1 py-1.5 rounded-lg border text-xs font-mono font-medium transition-colors flex items-center justify-center gap-1 ${
                     fps === 60
                       ? 'bg-white/15 border-amber-400 text-white'
@@ -250,7 +217,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   }`}
                 >
                   <span>60 FPS</span>
-                  {!isPro && <Crown className="w-3 h-3 text-amber-400" />}
                 </button>
               </div>
             </div>
@@ -289,11 +255,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <button
             onClick={handleStartExport}
             disabled={isExporting}
-            className={`flex-1 py-3 px-4 rounded-xl font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
-              isPro
-                ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-amber-500/20'
-                : 'bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700'
-            }`}
+            className="flex-1 py-3 px-4 rounded-xl font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 bg-amber-400 hover:bg-amber-300 text-black shadow-amber-500/20"
           >
             {isExporting ? (
               <>
@@ -303,11 +265,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                <span>
-                  {isPro
-                    ? 'Download Clean Video (No Watermark)'
-                    : 'Download with Watermark (Free)'}
-                </span>
+                <span>Download</span>
               </>
             )}
           </button>

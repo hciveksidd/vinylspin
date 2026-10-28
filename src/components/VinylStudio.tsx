@@ -15,7 +15,6 @@ import {
   Sparkles,
   Sliders,
   Download,
-  Crown,
   Eye,
   Layers,
   Image as ImageIcon,
@@ -31,18 +30,15 @@ import {
   VinylColor,
   BackgroundStyle,
   AspectRatio,
-  UserSubscription,
 } from '../types';
 import { globalAudioEngine, PRESET_TRACKS } from '../utils/audioEngine';
 import { renderFrame } from '../utils/canvasRenderer';
 
 interface VinylStudioProps {
   toolId: StudioToolId;
-  onOpenPricing: () => void;
   onOpenExport: () => void;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  subscription: UserSubscription;
-  onToggleSubscription: () => void;
+  showWatermark: boolean;
   metadata: TrackMetadata;
   setMetadata: React.Dispatch<React.SetStateAction<TrackMetadata>>;
   settings: VisualizerSettings;
@@ -53,11 +49,9 @@ interface VinylStudioProps {
 
 export const VinylStudio: React.FC<VinylStudioProps> = ({
   toolId,
-  onOpenPricing,
   onOpenExport,
   canvasRef,
-  subscription,
-  onToggleSubscription,
+  showWatermark,
   metadata,
   setMetadata,
   settings,
@@ -65,8 +59,6 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
   coverImage,
   setCoverImage,
 }) => {
-  const isPro = subscription.status === 'active' && subscription.planId !== 'free';
-
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [volume, setVolume] = useState<number>(0.85);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -207,7 +199,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
         frequencyData: freqData,
         waveformData: waveData,
         bassEnergy,
-        isWatermarked: !isPro, // In Pro mode, watermark is REMOVED!
+        isWatermarked: showWatermark,
       });
 
       animationFrameRef.current = requestAnimationFrame(loop);
@@ -220,7 +212,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [canvasRef, toolId, metadata, settings, coverImage, isPlaying, isPro]);
+  }, [canvasRef, toolId, metadata, settings, coverImage, isPlaying, showWatermark]);
 
   // Adjust volume
   const handleVolumeChange = (v: number) => {
@@ -242,50 +234,6 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
       
-      {/* Monetization / Pro Banner Notice */}
-      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-[#171a23] via-[#1a1e29] to-[#171a23] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-            <Crown className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">
-                {isPro ? 'Pro Subscription: 100% Watermark-Free' : 'Free Mode: Watermark Active'}
-              </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                isPro ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-              }`}>
-                {isPro ? 'PRO ACTIVE' : 'FREE TIER'}
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {isPro
-                ? 'Your exports will be rendered without watermark in crisp 4K 60fps.'
-                : 'Free tier exports include the SpinningVinyl watermark. Upgrade to remove it or test Pro mode instantly.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={onToggleSubscription}
-            className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-zinc-300 transition-colors"
-          >
-            {isPro ? 'Switch to Free Mode' : 'Test Pro Mode'}
-          </button>
-          {!isPro && (
-            <button
-              onClick={onOpenPricing}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Crown className="w-4 h-4 fill-black" />
-              <span>Upgrade to Pro ($9)</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Main Studio 2-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -305,16 +253,6 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
                 </span>
               )}
             </div>
-
-            {/* Simulated Watermark Badge on Top-Right */}
-            {!isPro && (
-              <div className="absolute top-4 right-4 z-10">
-                <div className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  <span>Watermarked Preview</span>
-                </div>
-              </div>
-            )}
 
             {/* The Real Canvas Render Element */}
             <div className="w-full flex items-center justify-center">
@@ -374,7 +312,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
             <div>
               <div className="text-xs font-bold text-white">Ready to Export?</div>
               <div className="text-[11px] text-zinc-400">
-                {isPro ? 'Render clean MP4/WebM video without watermark.' : 'Download free with watermark or upgrade to remove.'}
+                Render a video, GIF or still frame of the current scene.
               </div>
             </div>
 
@@ -383,7 +321,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-extrabold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Export Visual ({isPro ? 'No Watermark' : 'Free Watermark'})</span>
+              <span>Export Visual</span>
             </button>
           </div>
         </div>

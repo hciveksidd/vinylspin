@@ -813,8 +813,7 @@ function drawParticles(
 }
 
 /**
- * Renders the watermark stamp for the free tier.
- * In Pro subscription mode, this function is completely skipped!
+ * Renders the optional SpinningVinyl credit badge.
  */
 export function drawWatermark(
   ctx: CanvasRenderingContext2D,
