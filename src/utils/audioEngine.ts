@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { computePeaks } from './waveform';
+
 export interface BuiltinPreset {
   id: string;
   title: string;
@@ -72,6 +74,9 @@ export class AudioEngine {
   // Playback position bookkeeping for user files: position = offset + (ctx.currentTime - startedAt)
   private startedAt = 0;
   private offset = 0;
+  // Set while previewing a segment: playback ends at segmentEnd and rewinds to segmentStart
+  private segmentStart: number | null = null;
+  private segmentEnd: number | null = null;
   private listeners = new Set<(playing: boolean) => void>();
 
   constructor() {
@@ -183,6 +188,7 @@ export class AudioEngine {
     if (this.audioBuffer && this.ctx && this.gainNode) {
       // Play loaded user file from the saved position
       if (this.offset >= this.audioBuffer.duration) this.offset = 0;
+      const playLength = this.segmentEnd !== null ? Math.max(0.01, this.segmentEnd - this.offset) : undefined;
       const source = this.ctx.createBufferSource();
       source.buffer = this.audioBuffer;
       source.connect(this.gainNode);
@@ -190,13 +196,15 @@ export class AudioEngine {
         // Ignore sources we stopped ourselves (pause / seek / stop)
         if (this.sourceNode !== source) return;
         this.sourceNode = null;
-        this.offset = 0;
+        this.offset = this.segmentStart ?? 0;
+        this.segmentStart = null;
+        this.segmentEnd = null;
         this.stopVinylCrackle();
         this.setPlaying(false);
       };
       this.sourceNode = source;
       this.startedAt = this.ctx.currentTime;
-      source.start(0, this.offset);
+      source.start(0, this.offset, playLength);
       this.setPlaying(true);
     } else {
       // Play procedural audio synth loop (its step callback checks isPlaying)
@@ -213,6 +221,8 @@ export class AudioEngine {
   public pause() {
     if (!this.isPlaying) return;
     this.offset = this.getCurrentTime();
+    this.segmentStart = null;
+    this.segmentEnd = null;
     this.stopSource();
     this.stopSynthLoop();
     this.stopVinylCrackle();
@@ -223,6 +233,21 @@ export class AudioEngine {
   public stop() {
     this.pause();
     this.offset = 0;
+  }
+
+  /** Preview part of the loaded track; it stops by itself at the end of the segment. */
+  public playSegment(start: number, duration: number) {
+    if (!this.audioBuffer) return;
+    this.pause();
+    this.offset = Math.max(0, Math.min(start, this.audioBuffer.duration));
+    this.segmentStart = this.offset;
+    this.segmentEnd = Math.min(this.audioBuffer.duration, this.offset + duration);
+    this.play();
+  }
+
+  /** Normalised waveform peaks of the loaded track, or null when no file is loaded. */
+  public getPeaks(buckets: number): Float32Array | null {
+    return this.audioBuffer ? computePeaks(this.audioBuffer.getChannelData(0), buckets) : null;
   }
 
   /** Jump to a position (seconds) in the user file; restarts the preset loop from its first step. */

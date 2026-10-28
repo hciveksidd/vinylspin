@@ -10,6 +10,7 @@ import { VinylStudio } from './components/VinylStudio';
 import { ExportModal } from './components/ExportModal';
 import { EpkGenerator } from './components/EpkGenerator';
 import { AudioUtilities } from './components/AudioUtilities';
+import { ArtworkStudio } from './components/ArtworkStudio';
 import { ContactModal } from './components/ContactModal';
 import {
   StudioToolId,
@@ -98,7 +99,9 @@ export default function App() {
                 className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-amber-400 font-bold flex items-center gap-1.5 transition-colors"
               >
                 <span>
-                  {activeTool === 'vinyl-video'
+                  {activeTool === 'artwork-video'
+                    ? 'Artwork video'
+                    : activeTool === 'vinyl-video'
                     ? 'Vinyl video maker'
                     : activeTool === 'cd-video'
                     ? 'Spinning CD maker'
@@ -124,7 +127,9 @@ export default function App() {
         </div>
 
         {/* Viewport Router */}
-        {activeTool === 'press-kit' ? (
+        {activeTool === 'artwork-video' ? (
+          <ArtworkStudio />
+        ) : activeTool === 'press-kit' ? (
           <EpkGenerator />
         ) : isUtilityTool ? (
           <AudioUtilities

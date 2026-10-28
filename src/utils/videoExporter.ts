@@ -13,6 +13,7 @@ export interface VideoExportOptions {
   durationSeconds: number; // e.g. 5 seconds for loop / Spotify Canvas
   fps: number; // 30 or 60
   includeAudio: boolean; // Spotify Canvas must be silent
+  audioStart?: number; // seconds into the loaded track where recording begins
   onProgress?: (progressPercent: number) => void;
   signal?: AbortSignal;
 }
@@ -39,7 +40,7 @@ export function pickVideoMimeType(isSupported: (mime: string) => boolean = (m) =
 }
 
 export async function exportVideo(options: VideoExportOptions): Promise<VideoExportResult> {
-  const { canvas, durationSeconds, fps, includeAudio, onProgress, signal } = options;
+  const { canvas, durationSeconds, fps, includeAudio, audioStart = 0, onProgress, signal } = options;
 
   // 1. Get canvas video stream
   const canvasStream = canvas.captureStream(fps);
@@ -51,7 +52,7 @@ export async function exportVideo(options: VideoExportOptions): Promise<VideoExp
     const audioDestination = globalAudioEngine.getStreamDestination();
     const audioTrack = audioDestination?.stream.getAudioTracks()[0];
     if (audioTrack) tracks.push(audioTrack);
-    globalAudioEngine.seek(0);
+    globalAudioEngine.seek(audioStart);
     globalAudioEngine.play();
   }
 

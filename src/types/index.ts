@@ -4,6 +4,7 @@
  */
 
 export type StudioToolId =
+  | 'artwork-video'
   | 'vinyl-video'
   | 'cd-video'
   | 'music-visualizer'
