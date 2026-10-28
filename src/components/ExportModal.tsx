@@ -13,18 +13,29 @@ import {
   FileCheck,
   AlertCircle,
   Share2,
+  Film,
 } from 'lucide-react';
-import { StudioToolId } from '../types';
-import { exportVideo, downloadBlob, downloadCanvasSnapshot } from '../utils/videoExporter';
+import { StudioToolId, TrackMetadata, VisualizerSettings } from '../types';
+import {
+  exportVideo,
+  exportSeamlessLoop,
+  exportGif,
+  downloadBlob,
+  downloadCanvasSnapshot,
+} from '../utils/videoExporter';
+import { seamlessLoopDuration } from '../utils/loopRenderer';
 import { globalAudioEngine } from '../utils/audioEngine';
 
-type ExportType = 'video' | 'canvas-loop' | 'snapshot';
+type ExportType = 'video' | 'canvas-loop' | 'gif' | 'snapshot';
 
 // Spotify Canvas spec: 3–8 seconds, no audio
-const DURATIONS: Record<Exclude<ExportType, 'snapshot'>, number[]> = {
+const DURATIONS: Record<'video' | 'canvas-loop', number[]> = {
   video: [5, 10, 15, 30],
   'canvas-loop': [3, 5, 8],
 };
+
+const GIF_FPS = 20;
+const GIF_WIDTH = 480;
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -33,7 +44,9 @@ interface ExportModalProps {
   showWatermark: boolean;
   onToggleWatermark: (value: boolean) => void;
   toolId: StudioToolId;
-  trackTitle: string;
+  metadata: TrackMetadata;
+  settings: VisualizerSettings;
+  coverImage: HTMLImageElement | null;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -43,8 +56,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   showWatermark,
   onToggleWatermark,
   toolId,
-  trackTitle,
+  metadata,
+  settings,
+  coverImage,
 }) => {
+  const trackTitle = metadata.title;
   const [exportType, setExportType] = useState<ExportType>('video');
   const [durationSeconds, setDurationSeconds] = useState<number>(10);
   const [fps, setFps] = useState<number>(30);
@@ -57,19 +73,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   // Pick a sensible default format whenever the dialog opens
   useEffect(() => {
     if (!isOpen) return;
-    selectType(toolId === 'spotify-canvas' ? 'canvas-loop' : 'video');
+    selectType(
+      toolId === 'spotify-canvas'
+        ? 'canvas-loop'
+        : toolId === 'vinyl-gif' || toolId === 'cd-gif'
+        ? 'gif'
+        : 'video',
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, toolId]);
 
   if (!isOpen) return null;
 
   const trackDuration = Math.floor(globalAudioEngine.getDuration());
+  const rpm = settings.rotationSpeed;
+  const loopSeconds = seamlessLoopDuration(durationSeconds, rpm, 3, 8);
+  const gifSeconds = seamlessLoopDuration(2, rpm, 1.5, 4);
 
   function selectType(type: ExportType) {
     setExportType(type);
     setExportComplete(false);
     setExportError(null);
-    if (type !== 'snapshot') setDurationSeconds(type === 'canvas-loop' ? 5 : 10);
+    if (type === 'video' || type === 'canvas-loop') setDurationSeconds(type === 'canvas-loop' ? 5 : 10);
   }
 
   const handleClose = () => {
@@ -96,18 +121,40 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setIsExporting(true);
     setExportProgress(0);
 
-    try {
-      const { blob, extension } = await exportVideo({
-        canvas,
-        durationSeconds,
-        fps,
-        includeAudio: exportType === 'video',
-        onProgress: (p) => setExportProgress(p),
-        signal: controller.signal,
-      });
+    const scene = { toolId, metadata, settings, coverImage, showWatermark };
+    const onProgress = (p: number) => setExportProgress(p);
 
-      const suffix = exportType === 'canvas-loop' ? 'spotify-canvas' : toolId;
-      downloadBlob(blob, `${cleanTitle}-${suffix}.${extension}`);
+    try {
+      if (exportType === 'gif') {
+        const blob = await exportGif({
+          inputs: scene,
+          durationSeconds: gifSeconds,
+          fps: GIF_FPS,
+          maxWidth: GIF_WIDTH,
+          onProgress,
+          signal: controller.signal,
+        });
+        downloadBlob(blob, `${cleanTitle}-${toolId}.gif`);
+      } else if (exportType === 'canvas-loop') {
+        const { blob, extension } = await exportSeamlessLoop({
+          inputs: scene,
+          durationSeconds: loopSeconds,
+          fps,
+          onProgress,
+          signal: controller.signal,
+        });
+        downloadBlob(blob, `${cleanTitle}-spotify-canvas.${extension}`);
+      } else {
+        const { blob, extension } = await exportVideo({
+          canvas,
+          durationSeconds,
+          fps,
+          includeAudio: true,
+          onProgress,
+          signal: controller.signal,
+        });
+        downloadBlob(blob, `${cleanTitle}-${toolId}.${extension}`);
+      }
       setExportComplete(true);
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -166,7 +213,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Export Type Selection */}
         <div className="space-y-4 mb-6">
           <label className="block text-xs font-semibold text-zinc-300">Format</label>
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <button
               disabled={isExporting}
               onClick={() => selectType('video')}
@@ -197,6 +244,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
             <button
               disabled={isExporting}
+              onClick={() => selectType('gif')}
+              className={`p-3 rounded-xl border text-left transition-all ${
+                exportType === 'gif'
+                  ? 'bg-amber-500/15 border-amber-500/50 text-white'
+                  : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Film className="w-4 h-4 text-pink-400 mb-1" />
+              <div className="text-xs font-bold">GIF</div>
+              <div className="text-[10px] text-zinc-400">{GIF_WIDTH}px seamless loop</div>
+            </button>
+
+            <button
+              disabled={isExporting}
               onClick={() => selectType('snapshot')}
               className={`p-3 rounded-xl border text-left transition-all ${
                 exportType === 'snapshot'
@@ -211,8 +272,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </div>
         </div>
 
+        {/* GIF info */}
+        {exportType === 'gif' && (
+          <p className="mb-6 text-[11px] text-zinc-400">
+            {gifSeconds.toFixed(1)}s loop at {GIF_FPS} fps, {GIF_WIDTH}px wide
+            {rpm > 0 ? ' — a whole number of turns, so it repeats without a jump.' : '.'}
+          </p>
+        )}
+
         {/* Options (Duration & FPS) */}
-        {exportType !== 'snapshot' && (
+        {(exportType === 'video' || exportType === 'canvas-loop') && (
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
@@ -248,6 +317,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </button>
                 )}
               </div>
+              {exportType === 'canvas-loop' && rpm > 0 && (
+                <p className="text-[10px] text-zinc-500 mt-1.5">
+                  Exports {loopSeconds.toFixed(1)}s: whole turns of the disc, so the loop is seamless.
+                </p>
+              )}
             </div>
 
             <div>
@@ -287,7 +361,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <span className="flex items-center gap-2 text-amber-400 font-semibold">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>
-                  {exportType === 'video' ? 'Recording video & audio' : 'Recording loop'} in real time...
+                  {exportType === 'video'
+                    ? 'Recording video & audio in real time...'
+                    : exportType === 'gif'
+                    ? 'Encoding GIF...'
+                    : 'Recording loop in real time...'}
                 </span>
               </span>
               <span className="font-mono text-white font-bold">{exportProgress}%</span>
@@ -327,7 +405,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {isExporting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Rendering {durationSeconds}s clip...</span>
+                <span>Rendering...</span>
               </>
             ) : (
               <>

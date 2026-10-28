@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Clock,
   Activity,
@@ -16,6 +16,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { StudioToolId } from '../types';
+import { bpmFromTaps, recentTaps } from '../utils/bpm';
 
 interface AudioUtilitiesProps {
   initialTool?: StudioToolId;
@@ -47,24 +48,37 @@ export const AudioUtilities: React.FC<AudioUtilitiesProps> = ({
     'c-2': true,
   });
 
-  const handleTap = () => {
-    const now = performance.now();
-    const newTimes = [...tapTimes, now].filter((t) => now - t < 3000);
-    setTapTimes(newTimes);
+  // Ref mirror of tapTimes so the keyboard listener always sees the latest taps
+  const tapsRef = useRef<number[]>([]);
 
-    if (newTimes.length >= 2) {
-      const intervals: number[] = [];
-      for (let i = 1; i < newTimes.length; i++) {
-        intervals.push(newTimes[i] - newTimes[i - 1]);
-      }
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const calcBpm = Math.round(60000 / avgInterval);
-      setTappedBpm(calcBpm);
-      setBpmInput(calcBpm);
+  const handleTap = useCallback(() => {
+    const now = performance.now();
+    const taps = recentTaps([...tapsRef.current, now], now);
+    tapsRef.current = taps;
+    setTapTimes(taps);
+    const bpm = bpmFromTaps(taps);
+    if (bpm !== null) {
+      setTappedBpm(bpm);
+      setBpmInput(bpm);
     }
-  };
+  }, []);
+
+  // Spacebar taps while the tap-tempo tab is open (but not while typing in a field)
+  useEffect(() => {
+    if (activeTab !== 'bpm-key-finder') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))) return;
+      e.preventDefault();
+      handleTap();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTab, handleTap]);
 
   const resetTap = () => {
+    tapsRef.current = [];
     setTapTimes([]);
     setTappedBpm(null);
   };

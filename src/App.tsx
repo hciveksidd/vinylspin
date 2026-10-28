@@ -163,7 +163,9 @@ export default function App() {
         showWatermark={showWatermark}
         onToggleWatermark={setShowWatermark}
         toolId={activeTool}
-        trackTitle={metadata.title}
+        metadata={metadata}
+        settings={settings}
+        coverImage={coverImage}
       />
 
       <ContactModal
