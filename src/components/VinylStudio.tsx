@@ -33,6 +33,13 @@ import {
 } from '../types';
 import { globalAudioEngine, PRESET_TRACKS } from '../utils/audioEngine';
 import { renderFrame } from '../utils/canvasRenderer';
+import { getCanvasSize } from '../utils/canvasSize';
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface VinylStudioProps {
   toolId: StudioToolId;
@@ -71,12 +78,31 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
   const rotationAngleRef = useRef<number>(0);
   const startTimeRef = useRef<number>(performance.now());
 
+  const [position, setPosition] = useState<number>(0);
+
+  // Mirror the engine's play state (it can change from outside, e.g. export or track end)
+  useEffect(() => {
+    setIsPlaying(globalAudioEngine.getIsPlaying());
+    return globalAudioEngine.subscribe(setIsPlaying);
+  }, []);
+
+  // Poll the playback position of an uploaded track for the progress bar
+  useEffect(() => {
+    if (!customAudioName) return;
+    setPosition(globalAudioEngine.getCurrentTime());
+    if (!isPlaying) return;
+    const id = window.setInterval(() => setPosition(globalAudioEngine.getCurrentTime()), 250);
+    return () => clearInterval(id);
+  }, [isPlaying, customAudioName]);
+
   // Handle Play / Pause
   const togglePlay = () => {
-    const playing = globalAudioEngine.togglePlay(() => {
-      setIsPlaying(false);
-    });
-    setIsPlaying(playing);
+    globalAudioEngine.togglePlay();
+  };
+
+  const handleSeek = (seconds: number) => {
+    globalAudioEngine.seek(seconds);
+    setPosition(seconds);
   };
 
   // Switch built-in track
@@ -115,7 +141,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
 
       const res = await globalAudioEngine.loadUserFile(file);
       setMetadata((prev) => ({ ...prev, duration: Math.round(res.duration) }));
-      setIsPlaying(false);
+      setPosition(0);
     } catch (err) {
       console.error('Failed to load user audio', err);
     }
@@ -153,15 +179,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
     if (!ctx) return;
 
     // Adjust canvas resolution according to selected aspect ratio
-    const width = 1080;
-    let height = 1080;
-    if (settings.aspectRatio === '9:16') {
-      height = 1920;
-    } else if (settings.aspectRatio === '16:9') {
-      height = 608;
-    } else if (settings.aspectRatio === '4:5') {
-      height = 1350;
-    }
+    const { width, height } = getCanvasSize(settings.aspectRatio);
 
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -175,7 +193,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
       lastTimestamp = timestamp;
 
       // Update rotation if playing or manual speed > 0
-      if (settings.rotationSpeed > 0 && (isPlaying || true)) {
+      if (settings.rotationSpeed > 0) {
         // 33 RPM = 33.33 * 2pi / 60 radians per sec
         const speedMultiplier = settings.rotationSpeed / 33.33;
         const radPerSec = (33.33 * 2 * Math.PI) / 60;
@@ -244,7 +262,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
             {/* Aspect Ratio Header Overlay */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-[11px] font-mono text-zinc-300">
-                {settings.aspectRatio} · {settings.aspectRatio === '9:16' ? '1080×1920 (Reels/TikTok)' : settings.aspectRatio === '16:9' ? '1920×1080 (YouTube)' : '1080×1080 (Square)'}
+                {settings.aspectRatio} · {getCanvasSize(settings.aspectRatio).label}
               </span>
               {toolId === 'spotify-canvas' && (
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[11px] font-bold text-emerald-300 flex items-center gap-1">
@@ -260,7 +278,7 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
                 ref={canvasRef}
                 className="max-h-[520px] max-w-full rounded-xl shadow-2xl object-contain border border-white/5 transition-all"
                 style={{
-                  aspectRatio: settings.aspectRatio === '9:16' ? '9/16' : settings.aspectRatio === '16:9' ? '16/9' : '1/1',
+                  aspectRatio: getCanvasSize(settings.aspectRatio).css,
                 }}
               />
             </div>
@@ -283,6 +301,23 @@ export const VinylStudio: React.FC<VinylStudioProps> = ({
                 <div className="text-[11px] text-zinc-400 truncate">
                   {metadata.artist} · {metadata.bpm} BPM
                 </div>
+                {customAudioName && metadata.duration > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="range"
+                      min="0"
+                      max={metadata.duration}
+                      step="0.1"
+                      value={position}
+                      onChange={(e) => handleSeek(Number(e.target.value))}
+                      aria-label="Seek"
+                      className="flex-1 min-w-0 accent-amber-400 cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                      {formatTime(position)} / {formatTime(metadata.duration)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Volume Slider */}

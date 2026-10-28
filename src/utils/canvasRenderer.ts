@@ -858,21 +858,11 @@ export function drawWatermark(
   ctx.font = "700 11px 'Plus Jakarta Sans', sans-serif";
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(customText || 'SPINNINGVINYL • FREE TIER', bx + 42, by + 19);
+  ctx.fillText(customText || 'MADE WITH SPINNINGVINYL', bx + 42, by + 19);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
   ctx.font = "500 9px 'Plus Jakarta Sans', sans-serif";
-  ctx.fillText('UPGRADE TO REMOVE WATERMARK', bx + 42, by + 32);
-
-  // Diagonal anti-tamper watermark stripe across the canvas center
-  ctx.save();
-  ctx.translate(width / 2, height / 2);
-  ctx.rotate(-Math.PI / 6);
-  ctx.font = `800 ${Math.max(14, width * 0.024)}px 'Plus Jakarta Sans', sans-serif`;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.textAlign = 'center';
-  ctx.fillText('SPINNINGVINYL PREVIEW • UPGRADE TO REMOVE', 0, 0);
-  ctx.restore();
+  ctx.fillText('Music Video & Visualizer Studio', bx + 42, by + 32);
 
   ctx.restore();
 }

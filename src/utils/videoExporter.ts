@@ -3,50 +3,63 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fixWebmDuration from 'fix-webm-duration';
 import { globalAudioEngine } from './audioEngine';
 
 export interface VideoExportOptions {
   canvas: HTMLCanvasElement;
   durationSeconds: number; // e.g. 5 seconds for loop / Spotify Canvas
   fps: number; // 30 or 60
-  filename: string;
+  includeAudio: boolean; // Spotify Canvas must be silent
   onProgress?: (progressPercent: number) => void;
+  signal?: AbortSignal;
 }
 
-export async function exportVideo(options: VideoExportOptions): Promise<Blob> {
-  const { canvas, durationSeconds, fps, onProgress } = options;
+export interface VideoExportResult {
+  blob: Blob;
+  mimeType: string;
+  extension: 'mp4' | 'webm';
+}
+
+// H.264 MP4 first: it plays everywhere (Spotify, Instagram, iOS). Without H.264 (e.g. Chromium,
+// Firefox) prefer WebM over a bare 'video/mp4', which may hold VP9 that many players reject.
+// Bare 'video/mp4' stays last for Safari, which records MP4 only.
+const MIME_CANDIDATES = [
+  'video/mp4;codecs=avc1.42E01F,mp4a.40.2',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm',
+  'video/mp4',
+];
+
+export function pickVideoMimeType(isSupported: (mime: string) => boolean = (m) => MediaRecorder.isTypeSupported(m)): string {
+  return MIME_CANDIDATES.find((mime) => isSupported(mime)) ?? 'video/webm';
+}
+
+export async function exportVideo(options: VideoExportOptions): Promise<VideoExportResult> {
+  const { canvas, durationSeconds, fps, includeAudio, onProgress, signal } = options;
 
   // 1. Get canvas video stream
   const canvasStream = canvas.captureStream(fps);
-
-  // 2. Get audio stream from Web Audio engine
-  const audioDestination = globalAudioEngine.getStreamDestination();
   const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
 
-  if (audioDestination && audioDestination.stream.getAudioTracks().length > 0) {
-    tracks.push(audioDestination.stream.getAudioTracks()[0]);
+  // 2. Rewind and start the audio so the recording begins at the top of the track with sound
+  const wasPlaying = globalAudioEngine.getIsPlaying();
+  if (includeAudio) {
+    const audioDestination = globalAudioEngine.getStreamDestination();
+    const audioTrack = audioDestination?.stream.getAudioTracks()[0];
+    if (audioTrack) tracks.push(audioTrack);
+    globalAudioEngine.seek(0);
+    globalAudioEngine.play();
   }
 
   const combinedStream = new MediaStream(tracks);
-
-  // 3. Supported MIME types
-  const mimeTypes = [
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm',
-    'video/mp4',
-  ];
-  let selectedMime = 'video/webm';
-  for (const mime of mimeTypes) {
-    if (MediaRecorder.isTypeSupported(mime)) {
-      selectedMime = mime;
-      break;
-    }
-  }
+  const mimeType = pickVideoMimeType();
+  const extension = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
 
   const recorder = new MediaRecorder(combinedStream, {
-    mimeType: selectedMime,
-    videoBitsPerSecond: 6_000_000, // 6 Mbps high quality
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
   });
 
   const chunks: BlobPart[] = [];
@@ -59,6 +72,8 @@ export async function exportVideo(options: VideoExportOptions): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const startTime = performance.now();
     const durationMs = durationSeconds * 1000;
+    let aborted = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     const interval = setInterval(() => {
       const elapsed = performance.now() - startTime;
@@ -66,21 +81,48 @@ export async function exportVideo(options: VideoExportOptions): Promise<Blob> {
       if (onProgress) onProgress(progress);
     }, 100);
 
-    recorder.onstop = () => {
+    const cleanup = () => {
       clearInterval(interval);
-      if (onProgress) onProgress(100);
-      const blob = new Blob(chunks, { type: selectedMime });
-      resolve(blob);
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+      canvasStream.getVideoTracks().forEach((t) => t.stop());
+      if (includeAudio && !wasPlaying) globalAudioEngine.pause();
+    };
+
+    const onAbort = () => {
+      aborted = true;
+      if (recorder.state === 'recording') recorder.stop();
+    };
+
+    recorder.onstop = () => {
+      cleanup();
+      if (aborted) {
+        reject(new DOMException('Export cancelled', 'AbortError'));
+        return;
+      }
+      const blob = new Blob(chunks, { type: mimeType });
+      const finish = (result: Blob) => {
+        if (onProgress) onProgress(100);
+        resolve({ blob: result, mimeType, extension });
+      };
+      // MediaRecorder writes WebM without a duration header, so players can't seek; patch it in
+      if (extension === 'webm') {
+        fixWebmDuration(blob, performance.now() - startTime, { logger: false }).then(finish, () => finish(blob));
+      } else {
+        finish(blob);
+      }
     };
 
     recorder.onerror = (err) => {
-      clearInterval(interval);
+      cleanup();
       reject(err);
     };
 
-    recorder.start();
+    signal?.addEventListener('abort', onAbort);
+    recorder.start(1000);
+    if (signal?.aborted) onAbort();
 
-    setTimeout(() => {
+    timeout = setTimeout(() => {
       if (recorder.state === 'recording') {
         recorder.stop();
       }
