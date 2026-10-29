@@ -4,6 +4,7 @@
  */
 
 export type StudioToolId =
+  | 'artwork-video'
   | 'vinyl-video'
   | 'cd-video'
   | 'music-visualizer'
@@ -52,29 +53,6 @@ export interface VisualizerSettings {
   customBackgroundColor: string;
   particleColor: string;
   audioReactivePulse: boolean;
-}
-
-export type SubscriptionPlanId = 'free' | 'creator-pro' | 'label-studio';
-
-export interface SubscriptionPlan {
-  id: SubscriptionPlanId;
-  name: string;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  tagline: string;
-  features: string[];
-  watermarkFree: boolean;
-  maxResolution: '720p' | '1080p' | '4K';
-  maxFps: 30 | 60;
-  spotifyCanvasReady: boolean;
-  commercialLicense: boolean;
-}
-
-export interface UserSubscription {
-  planId: SubscriptionPlanId;
-  status: 'active' | 'free_trial' | 'free';
-  renewsOn?: string;
-  couponCode?: string;
 }
 
 export interface EPKData {

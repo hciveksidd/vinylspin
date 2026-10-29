@@ -59,6 +59,27 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
             
             <div className="space-y-2">
               <button
+                onClick={() => handleSelect('artwork-video')}
+                className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3.5 group ${
+                  activeTool === 'artwork-video'
+                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                    : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/15'
+                }`}
+              >
+                <div className="p-2 rounded-lg bg-zinc-800 text-pink-400 shrink-0 group-hover:scale-105 transition-transform">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+                    Artwork video
+                  </div>
+                  <div className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                    Your record image as a photo or a plain spinning disc, with a clip of your track.
+                  </div>
+                </div>
+              </button>
+
+              <button
                 onClick={() => handleSelect('vinyl-video')}
                 className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3.5 group ${
                   activeTool === 'vinyl-video'
@@ -241,7 +262,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                   Press kit generator
                 </div>
                 <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                  Your EPK + private demo links to labels.
+                  Build your EPK and download it as a web page.
                 </div>
               </button>
             </div>

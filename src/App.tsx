@@ -7,17 +7,15 @@ import React, { useState, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { ToolsModal } from './components/ToolsModal';
 import { VinylStudio } from './components/VinylStudio';
-import { PricingModal } from './components/PricingModal';
 import { ExportModal } from './components/ExportModal';
 import { EpkGenerator } from './components/EpkGenerator';
 import { AudioUtilities } from './components/AudioUtilities';
-import { ReferralModal } from './components/ReferralModal';
+import { ArtworkStudio } from './components/ArtworkStudio';
 import { ContactModal } from './components/ContactModal';
 import {
   StudioToolId,
   TrackMetadata,
   VisualizerSettings,
-  UserSubscription,
 } from './types';
 import { PRESET_TRACKS } from './utils/audioEngine';
 
@@ -27,16 +25,11 @@ export default function App() {
 
   // Modals visibility
   const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isReferralOpen, setIsReferralOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
 
-  // User subscription state: default free (watermarked)
-  const [subscription, setSubscription] = useState<UserSubscription>({
-    planId: 'free',
-    status: 'free',
-  });
+  // Optional SpinningVinyl credit badge on the canvas (off by default)
+  const [showWatermark, setShowWatermark] = useState(false);
 
   // Track metadata
   const [metadata, setMetadata] = useState<TrackMetadata>({
@@ -77,17 +70,6 @@ export default function App() {
   // Canvas ref for WebGL/2D rendering & video recording
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Fast toggle between Free (with watermark) and Pro (no watermark)
-  const handleToggleSubscription = () => {
-    setSubscription((prev) => {
-      if (prev.status === 'active' && prev.planId !== 'free') {
-        return { planId: 'free', status: 'free' };
-      } else {
-        return { planId: 'creator-pro', status: 'active', renewsOn: 'Next month' };
-      }
-    });
-  };
-
   const isUtilityTool =
     activeTool === 'bpm-to-ms' ||
     activeTool === 'bpm-key-finder' ||
@@ -101,11 +83,7 @@ export default function App() {
       <Navbar
         onOpenTools={() => setIsToolsOpen(!isToolsOpen)}
         isToolsOpen={isToolsOpen}
-        onOpenPricing={() => setIsPricingOpen(true)}
-        onOpenReferral={() => setIsReferralOpen(true)}
         onOpenContact={() => setIsContactOpen(true)}
-        subscription={subscription}
-        onToggleSubscription={handleToggleSubscription}
       />
 
       {/* Main Content Area */}
@@ -121,7 +99,9 @@ export default function App() {
                 className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-amber-400 font-bold flex items-center gap-1.5 transition-colors"
               >
                 <span>
-                  {activeTool === 'vinyl-video'
+                  {activeTool === 'artwork-video'
+                    ? 'Artwork video'
+                    : activeTool === 'vinyl-video'
                     ? 'Vinyl video maker'
                     : activeTool === 'cd-video'
                     ? 'Spinning CD maker'
@@ -143,21 +123,14 @@ export default function App() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-zinc-500">Export status:</span>
-              <span className={`font-semibold ${subscription.planId !== 'free' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {subscription.planId !== 'free' ? 'Pro (Watermark-Free)' : 'Free (Includes Watermark)'}
-              </span>
-            </div>
           </div>
         </div>
 
         {/* Viewport Router */}
-        {activeTool === 'press-kit' ? (
-          <EpkGenerator
-            subscription={subscription}
-            onOpenPricing={() => setIsPricingOpen(true)}
-          />
+        {activeTool === 'artwork-video' ? (
+          <ArtworkStudio />
+        ) : activeTool === 'press-kit' ? (
+          <EpkGenerator />
         ) : isUtilityTool ? (
           <AudioUtilities
             initialTool={activeTool}
@@ -166,11 +139,9 @@ export default function App() {
         ) : (
           <VinylStudio
             toolId={activeTool}
-            onOpenPricing={() => setIsPricingOpen(true)}
             onOpenExport={() => setIsExportOpen(true)}
             canvasRef={canvasRef}
-            subscription={subscription}
-            onToggleSubscription={handleToggleSubscription}
+            showWatermark={showWatermark}
             metadata={metadata}
             setMetadata={setMetadata}
             settings={settings}
@@ -190,26 +161,16 @@ export default function App() {
         onSelectTool={(tool) => setActiveTool(tool)}
       />
 
-      <PricingModal
-        isOpen={isPricingOpen}
-        onClose={() => setIsPricingOpen(false)}
-        subscription={subscription}
-        onUpdateSubscription={(sub) => setSubscription(sub)}
-      />
-
       <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         canvasRef={canvasRef}
-        subscription={subscription}
-        onOpenPricing={() => setIsPricingOpen(true)}
+        showWatermark={showWatermark}
+        onToggleWatermark={setShowWatermark}
         toolId={activeTool}
-        trackTitle={metadata.title}
-      />
-
-      <ReferralModal
-        isOpen={isReferralOpen}
-        onClose={() => setIsReferralOpen(false)}
+        metadata={metadata}
+        settings={settings}
+        coverImage={coverImage}
       />
 
       <ContactModal
@@ -227,12 +188,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6">
-            <button onClick={() => setIsPricingOpen(true)} className="hover:text-zinc-300 transition-colors">
-              Pricing Plans
-            </button>
-            <button onClick={() => setIsReferralOpen(true)} className="hover:text-zinc-300 transition-colors">
-              Affiliate Program
-            </button>
             <button onClick={() => setIsContactOpen(true)} className="hover:text-zinc-300 transition-colors">
               Label Support
             </button>

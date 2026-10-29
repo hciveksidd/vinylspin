@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { computePeaks } from './waveform';
+
 export interface BuiltinPreset {
   id: string;
   title: string;
@@ -68,7 +70,14 @@ export class AudioEngine {
   private isCrackleEnabled = false;
 
   private isPlaying = false;
-  private onEndedCallback: (() => void) | null = null;
+  private volume = 0.9;
+  // Playback position bookkeeping for user files: position = offset + (ctx.currentTime - startedAt)
+  private startedAt = 0;
+  private offset = 0;
+  // Set while previewing a segment: playback ends at segmentEnd and rewinds to segmentStart
+  private segmentStart: number | null = null;
+  private segmentEnd: number | null = null;
+  private listeners = new Set<(playing: boolean) => void>();
 
   constructor() {
     // Lazy initialize upon user gesture
@@ -83,7 +92,7 @@ export class AudioEngine {
       this.analyser.smoothingTimeConstant = 0.8;
 
       this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.value = 0.9;
+      this.gainNode.gain.value = this.volume;
 
       this.streamDestination = this.ctx.createMediaStreamDestination();
 
@@ -102,22 +111,18 @@ export class AudioEngine {
     return this.streamDestination;
   }
 
+  // Reused every frame to avoid allocating in the render loop; callers must not keep references
+  private freqBuffer = new Uint8Array(128);
+  private waveBuffer = new Uint8Array(128);
+
   public getFrequencyData(): Uint8Array {
-    if (!this.analyser) {
-      return new Uint8Array(64);
-    }
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-    return dataArray;
+    if (this.analyser) this.analyser.getByteFrequencyData(this.freqBuffer);
+    return this.freqBuffer;
   }
 
   public getWaveformData(): Uint8Array {
-    if (!this.analyser) {
-      return new Uint8Array(64);
-    }
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteTimeDomainData(dataArray);
-    return dataArray;
+    if (this.analyser) this.analyser.getByteTimeDomainData(this.waveBuffer);
+    return this.waveBuffer;
   }
 
   public getBassEnergy(): number {
@@ -132,6 +137,20 @@ export class AudioEngine {
     return sum / (count * 255);
   }
 
+  /** Subscribe to play/pause changes; returns an unsubscribe function. */
+  public subscribe(listener: (playing: boolean) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private setPlaying(playing: boolean) {
+    if (this.isPlaying === playing) return;
+    this.isPlaying = playing;
+    this.listeners.forEach((l) => l(playing));
+  }
+
   public async loadUserFile(file: File): Promise<{ duration: number }> {
     this.initContext();
     this.stop();
@@ -140,30 +159,57 @@ export class AudioEngine {
     const arrayBuffer = await file.arrayBuffer();
     if (!this.ctx) throw new Error('AudioContext failed');
     this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+    this.offset = 0;
     return { duration: this.audioBuffer.duration };
   }
 
-  public play(onEnded?: () => void) {
+  public hasUserTrack(): boolean {
+    return this.audioBuffer !== null;
+  }
+
+  /** Duration of the loaded user file in seconds, or 0 for procedural presets. */
+  public getDuration(): number {
+    return this.audioBuffer ? this.audioBuffer.duration : 0;
+  }
+
+  /** Current position in the loaded user file in seconds, or 0 for procedural presets. */
+  public getCurrentTime(): number {
+    if (!this.audioBuffer) return 0;
+    if (this.isPlaying && this.ctx) {
+      return Math.min(this.audioBuffer.duration, this.offset + this.ctx.currentTime - this.startedAt);
+    }
+    return this.offset;
+  }
+
+  public play() {
     this.initContext();
     if (this.isPlaying) return;
 
-    this.onEndedCallback = onEnded || null;
-
     if (this.audioBuffer && this.ctx && this.gainNode) {
-      // Play loaded user file
-      this.sourceNode = this.ctx.createBufferSource();
-      (this.sourceNode as AudioBufferSourceNode).buffer = this.audioBuffer;
-      this.sourceNode.connect(this.gainNode);
-      this.sourceNode.onended = () => {
-        this.isPlaying = false;
-        if (this.onEndedCallback) this.onEndedCallback();
+      // Play loaded user file from the saved position
+      if (this.offset >= this.audioBuffer.duration) this.offset = 0;
+      const playLength = this.segmentEnd !== null ? Math.max(0.01, this.segmentEnd - this.offset) : undefined;
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.audioBuffer;
+      source.connect(this.gainNode);
+      source.onended = () => {
+        // Ignore sources we stopped ourselves (pause / seek / stop)
+        if (this.sourceNode !== source) return;
+        this.sourceNode = null;
+        this.offset = this.segmentStart ?? 0;
+        this.segmentStart = null;
+        this.segmentEnd = null;
+        this.stopVinylCrackle();
+        this.setPlaying(false);
       };
-      (this.sourceNode as AudioBufferSourceNode).start(0);
-      this.isPlaying = true;
+      this.sourceNode = source;
+      this.startedAt = this.ctx.currentTime;
+      source.start(0, this.offset, playLength);
+      this.setPlaying(true);
     } else {
-      // Play procedural audio synth loop
+      // Play procedural audio synth loop (its step callback checks isPlaying)
+      this.setPlaying(true);
       this.startSynthLoop(this.currentPresetId);
-      this.isPlaying = true;
     }
 
     if (this.isCrackleEnabled) {
@@ -171,29 +217,67 @@ export class AudioEngine {
     }
   }
 
+  /** Pause playback, keeping the current position. */
+  public pause() {
+    if (!this.isPlaying) return;
+    this.offset = this.getCurrentTime();
+    this.segmentStart = null;
+    this.segmentEnd = null;
+    this.stopSource();
+    this.stopSynthLoop();
+    this.stopVinylCrackle();
+    this.setPlaying(false);
+  }
+
+  /** Stop playback and rewind to the start. */
   public stop() {
-    this.isPlaying = false;
+    this.pause();
+    this.offset = 0;
+  }
+
+  /** Preview part of the loaded track; it stops by itself at the end of the segment. */
+  public playSegment(start: number, duration: number) {
+    if (!this.audioBuffer) return;
+    this.pause();
+    this.offset = Math.max(0, Math.min(start, this.audioBuffer.duration));
+    this.segmentStart = this.offset;
+    this.segmentEnd = Math.min(this.audioBuffer.duration, this.offset + duration);
+    this.play();
+  }
+
+  /** Normalised waveform peaks of the loaded track, or null when no file is loaded. */
+  public getPeaks(buckets: number): Float32Array | null {
+    return this.audioBuffer ? computePeaks(this.audioBuffer.getChannelData(0), buckets) : null;
+  }
+
+  /** Jump to a position (seconds) in the user file; restarts the preset loop from its first step. */
+  public seek(seconds: number) {
+    const wasPlaying = this.isPlaying;
+    this.pause();
+    this.offset = this.audioBuffer ? Math.max(0, Math.min(seconds, this.audioBuffer.duration)) : 0;
+    if (wasPlaying) this.play();
+  }
+
+  private stopSource() {
     if (this.sourceNode) {
+      const source = this.sourceNode;
+      this.sourceNode = null;
       try {
-        (this.sourceNode as AudioBufferSourceNode).stop();
-        this.sourceNode.disconnect();
+        (source as AudioBufferSourceNode).stop();
+        source.disconnect();
       } catch {
         // ignore already stopped
       }
-      this.sourceNode = null;
     }
-    this.stopSynthLoop();
-    this.stopVinylCrackle();
   }
 
-  public togglePlay(onEnded?: () => void): boolean {
+  public togglePlay(): boolean {
     if (this.isPlaying) {
-      this.stop();
-      return false;
+      this.pause();
     } else {
-      this.play(onEnded);
-      return true;
+      this.play();
     }
+    return this.isPlaying;
   }
 
   public getIsPlaying(): boolean {
@@ -201,18 +285,18 @@ export class AudioEngine {
   }
 
   public setVolume(val: number) {
+    this.volume = Math.max(0, Math.min(1, val));
     if (this.gainNode && this.ctx) {
-      this.gainNode.gain.setValueAtTime(Math.max(0, Math.min(1, val)), this.ctx.currentTime);
+      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
     }
   }
 
   public selectPreset(presetId: string) {
     this.currentPresetId = presetId;
+    const wasPlaying = this.isPlaying;
+    this.stop();
     this.audioBuffer = null; // clear user buffer to use synth preset
-    if (this.isPlaying) {
-      this.stop();
-      this.play();
-    }
+    if (wasPlaying) this.play();
   }
 
   public setVinylCrackle(enabled: boolean) {
