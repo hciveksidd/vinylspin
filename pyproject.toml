@@ -1,0 +1,30 @@
+[project]
+name = "stillhiring"
+version = "0.1.0"
+description = "How long companies keep posting in HN \"Who is hiring?\" threads"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []  # the pipeline uses the standard library only
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+stillhiring = "stillhiring.cli:main"
+
+[tool.setuptools]
+packages = ["stillhiring"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# E501: long regular expressions read better unwrapped.
+# SIM905: word lists stay as "a b c".split(), one literal per line is unreadable.
+ignore = ["E501", "SIM905"]

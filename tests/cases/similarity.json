@@ -1,0 +1,173 @@
+[
+ {
+  "name": "identical",
+  "old": "We build robots that sort parcels.",
+  "new": "We build robots that sort parcels.",
+  "old_tokens": [
+   "we",
+   "build",
+   "robots",
+   "that",
+   "sort",
+   "parcels"
+  ],
+  "ratio": 1.0
+ },
+ {
+  "name": "one word changed in ten",
+  "old": "one two three four five six seven eight nine ten",
+  "new": "one two three four five six seven eight nine eleven",
+  "old_tokens": [
+   "one",
+   "two",
+   "three",
+   "four",
+   "five",
+   "six",
+   "seven",
+   "eight",
+   "nine",
+   "ten"
+  ],
+  "ratio": 0.9
+ },
+ {
+  "name": "nothing shared",
+  "old": "alpha beta gamma",
+  "new": "delta epsilon zeta",
+  "old_tokens": [
+   "alpha",
+   "beta",
+   "gamma"
+  ],
+  "ratio": 0.0
+ },
+ {
+  "name": "case and punctuation",
+  "old": "Hiring: Rust, Go & C++ devs!",
+  "new": "hiring rust go c devs",
+  "old_tokens": [
+   "hiring",
+   "rust",
+   "go",
+   "c",
+   "devs"
+  ],
+  "ratio": 1.0
+ },
+ {
+  "name": "link with trailing punctuation",
+  "old": "Apply at https://acme.example/jobs/42.",
+  "new": "Apply at https://acme.example/jobs/43 today",
+  "old_tokens": [
+   "apply",
+   "at",
+   "https://acme.example/jobs/42"
+  ],
+  "ratio": 0.571429
+ },
+ {
+  "name": "curly apostrophes and accents",
+  "old": "We’re hiring in Zürich – don't wait",
+  "new": "We're hiring in Zurich - don’t wait",
+  "old_tokens": [
+   "we’re",
+   "hiring",
+   "in",
+   "zürich",
+   "don't",
+   "wait"
+  ],
+  "ratio": 0.5
+ },
+ {
+  "name": "paragraphs swapped",
+  "old": "the quick brown fox jumps over the lazy dog and then the cat sleeps on the warm mat",
+  "new": "the cat sleeps on the warm mat and then the quick brown fox jumps over the lazy dog",
+  "old_tokens": [
+   "the",
+   "quick",
+   "brown",
+   "fox",
+   "jumps",
+   "over",
+   "the",
+   "lazy",
+   "dog",
+   "and",
+   "then",
+   "the",
+   "cat",
+   "sleeps",
+   "on",
+   "the",
+   "warm",
+   "mat"
+  ],
+  "ratio": 0.5
+ },
+ {
+  "name": "repeated words",
+  "old": "to be or not to be that is the question to be",
+  "new": "not to be or to be is that the question",
+  "old_tokens": [
+   "to",
+   "be",
+   "or",
+   "not",
+   "to",
+   "be",
+   "that",
+   "is",
+   "the",
+   "question",
+   "to",
+   "be"
+  ],
+  "ratio": 0.727273
+ },
+ {
+  "name": "role list edited",
+  "old": "Senior Backend Engineer, Staff SRE, Product Designer. Remote in the EU. 90k-120k.",
+  "new": "Senior Backend Engineer, Data Engineer, Product Designer, Recruiter. Remote in the EU. 95k-125k.",
+  "old_tokens": [
+   "senior",
+   "backend",
+   "engineer",
+   "staff",
+   "sre",
+   "product",
+   "designer",
+   "remote",
+   "in",
+   "the",
+   "eu",
+   "90k",
+   "120k"
+  ],
+  "ratio": 0.666667
+ },
+ {
+  "name": "one side empty",
+  "old": "",
+  "new": "anything at all",
+  "old_tokens": [],
+  "ratio": 0.0
+ },
+ {
+  "name": "numbers and units",
+  "old": "team of 40 people, $2M ARR, 3 offices",
+  "new": "team of 60 people, $5M ARR, 3 offices",
+  "old_tokens": [
+   "team",
+   "of",
+   "40",
+   "people",
+   "2m",
+   "arr",
+   "3",
+   "offices"
+  ],
+  "ratio": 0.75
+ }
+]
