@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Still Hiring? – who keeps posting in HN “Who is hiring?”</title>
+<meta name="description" content="How many months in a row each company has posted in Hacker News “Who is hiring?” threads, and how much its post changes from month to month.">
+<meta name="color-scheme" content="light dark">
+<!-- Set this to the project's repository, e.g. https://github.com/you/still-hiring,
+     to show the source and correction links. Left empty, the links are not shown. -->
+<meta name="repository" content="">
+<meta name="theme-color" content="#ff6600">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="page">
+  <header id="top">
+    <a class="brand" href="#">
+      <svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M18.05 17.08A7.9 7.9 0 1 1 19.5 9.5M19.5 4.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <b>Still Hiring?</b>
+    </a>
+    <nav aria-label="Views">
+      <a href="#" data-view="all">all</a><span class="bar" aria-hidden="true"> | </span><a href="#f=same" data-view="same">same text</a><span class="bar" aria-hidden="true"> | </span><a href="#f=stopped" data-view="stopped">stopped</a><span class="bar" aria-hidden="true"> | </span><a href="#f=new" data-view="new">new</a><span class="bar" aria-hidden="true"> | </span><a href="#about" data-view="about">about</a>
+    </nav>
+    <span id="updated"></span>
+  </header>
+
+  <main id="main">
+    <p id="status" role="status">Loading…</p>
+    <noscript><p>This page needs JavaScript to load its data.</p></noscript>
+
+    <section id="view-list" hidden>
+      <p class="lede" id="lede"></p>
+      <div class="charts" id="charts"></div>
+      <form class="controls" id="controls" role="search">
+        <label class="field" for="q"><span>search</span>
+          <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="company name">
+        </label>
+        <span class="sort" id="sort">sort:
+          <a href="#" data-sort="run">in a row</a> |
+          <a href="#" data-sort="same">same text</a> |
+          <a href="#" data-sort="threads">threads</a> |
+          <a href="#" data-sort="last">last seen</a> |
+          <a href="#" data-sort="name">name</a>
+        </span>
+        <label class="field sort-pick" for="sort-select"><span>sort by</span>
+          <select id="sort-select">
+            <option value="run">in a row</option>
+            <option value="same">same text</option>
+            <option value="threads">threads</option>
+            <option value="last">last seen</option>
+            <option value="name">name</option>
+          </select>
+        </label>
+      </form>
+      <p class="count" id="count"></p>
+      <div class="legend" id="legend"></div>
+      <table class="items" id="items">
+        <thead>
+          <tr>
+            <th class="rank" scope="col"><span class="visually-hidden">Rank</span></th>
+            <th scope="col">company</th>
+            <th class="strip-head" scope="col">
+              <span class="range"><span id="strip-from"></span><span id="strip-to"></span></span>
+            </th>
+            <th scope="col">now</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="more"><a href="#" id="more">More</a></p>
+    </section>
+
+    <section id="view-company" hidden></section>
+
+    <section id="view-about" class="prose" hidden>
+      <h1>About</h1>
+      <p>On the first weekday of every month the Hacker News account <i>whoishiring</i> opens an “Ask HN: Who is hiring?” thread, and companies post their openings as top-level comments. This page reads every thread since <span data-meta="first-month">January 2019</span>, groups the posts by company, and counts two things: how many threads in a row a company has posted in, and how much of its post is the same text as the time before.</p>
+
+      <h2>The numbers</h2>
+      <dl>
+        <dt>in a row</dt>
+        <dd>Consecutive monthly threads with at least one post from the company, counting back from the newest thread. For the first <span data-meta="open-days">7</span> days of a new thread, a company that has not posted in it yet keeps its run.</dd>
+        <dt>similarity</dt>
+        <dd>The share of words a post has in common, in the same order, with the company's previous post. Links count as one word. When a company posts several times in one thread, each post is compared with the earlier post it resembles most.</dd>
+        <dt>same text</dt>
+        <dd>How many of the threads in a run, counting back from the newest, carried nearly the same post: at least <span data-meta="same-text">90</span>% similar to the month before. The “same text” view lists companies at <span data-meta="long-run">6</span> or more.</dd>
+        <dt>stopped</dt>
+        <dd>The company posted <span data-meta="stopped-run">4</span> or more threads in a row and is not in the newest one.</dd>
+        <dt>the strip</dt>
+        <dd>The last <span data-meta="strip-len">24</span> threads, newest on the right. An empty cell means no post, an outlined cell is the company's first post, and a filled cell gets darker the more it repeats the previous post.</dd>
+      </dl>
+
+      <h2>What the numbers do not say</h2>
+      <ul>
+        <li>A company missing from a thread may still be hiring. It did not post there, and that is all this page knows.</li>
+        <li>The same text every month does not mean the same job is still open. Some teams hire for one role continuously; others reuse a template for new openings.</li>
+        <li>Nothing here says whether a posting is genuine. This page counts posts. It does not judge them.</li>
+      </ul>
+
+      <h2>How posts are matched to companies</h2>
+      <p>Posts are matched by the link to the company's job board or own site, then by the name on the post's first line, then by the HN account that wrote it. A link shared by unrelated names, such as a fund's portfolio board, a job board or a recruiter's address, is not used. Two groups with the same name that point to different sites stay separate unless the same account wrote both or the texts are alike.</p>
+      <p>This goes wrong sometimes. One company can show up as two, and now and then two show up as one, which makes a run look shorter or longer than it was. Roles, location and pay are read from the first line of a post by pattern and can be missing or wrong.</p>
+
+      <h2>Corrections</h2>
+      <p id="corrections">If a company is split in two, merged with another one or misnamed, report it to whoever runs this copy of the site. Fixes go into a public overrides file and take effect with the next daily build.</p>
+
+      <h2>Data</h2>
+      <p>Posts come from Hacker News through the <a href="https://hn.algolia.com/api">HN Search API</a>. This site publishes post ids, counts and the short facts from a post's first line. It does not store or republish the text of posts or the names of the accounts that wrote them: when you open a diff, your browser fetches the two posts from HN.</p>
+      <p>The data is rebuilt once a day. This site is not affiliated with Hacker News or Y Combinator.</p>
+    </section>
+  </main>
+
+  <footer id="foot">
+    <span class="links"><a href="#about">about</a><span id="repo-links"></span></span>
+    <p>Data from Hacker News via the HN Search API. Post text is fetched from HN in your browser and is not stored here.<br>Not affiliated with Hacker News or Y Combinator.</p>
+  </footer>
+</div>
+<div id="tip" role="tooltip" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

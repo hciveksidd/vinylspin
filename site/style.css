@@ -1,0 +1,942 @@
+/* Still Hiring? - laid out after Hacker News: one beige column, an orange bar,
+   Verdana, grey small print. Colours and type sizes are tokens: dark mode and
+   the phone layout swap the tokens instead of restyling every rule. */
+
+:root {
+  color-scheme: light dark;
+  --page: #ffffff;
+  --surface: #f6f6ef;
+  --text: #000000;
+  --muted: #666666;
+  --rule: #e2e2d8;
+  --bar: #ff6600;
+  --bar-text: #000000;
+  /* Similarity ramp: one hue, darker = more of the previous post repeated.
+     Checked with the dataviz validator (--ordinal) against --surface. */
+  --cell-none: #e8e8df;
+  --s1: #f08a3c; /* under 50% the same */
+  --s2: #cc5500; /* 50-89% */
+  --s3: #803300; /* 90% and up */
+  --mark: #cc5500; /* chart columns */
+  --mark-on: #803300;
+  --ins: #dcefd0;
+  --del: #f6dcdc;
+  --del-text: #7a2e2e;
+  --tip: #ffffff;
+  --focus: #b34700;
+  /* Type: Hacker News proportions on a desktop. */
+  --fs: 10pt;
+  --fs-small: 8pt;
+  --fs-title: 13pt;
+  --fs-diff: 9pt;
+  --fs-chart: 10px;
+  --gutter: 8px;
+  --rank: 3.2em;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #141311;
+    --surface: #1e1d1a;
+    --text: #dcd8cf;
+    --muted: #a39f95;
+    --rule: #34322d;
+    /* On a dark surface the ramp flips: brighter = more repeated. */
+    --cell-none: #2b2a26;
+    --s1: #96481a;
+    --s2: #d06a20;
+    --s3: #ffa15c;
+    --mark: #d06a20;
+    --mark-on: #ffa15c;
+    --ins: #24391f;
+    --del: #472424;
+    --del-text: #e0aaaa;
+    --tip: #2b2a26;
+    --focus: #ffa15c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 8px;
+  background: var(--page);
+  color: var(--text);
+  font-family: Verdana, Geneva, sans-serif;
+  font-size: var(--fs);
+  line-height: 1.35;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#page {
+  width: 85%;
+  max-width: 1040px;
+  margin: 0 auto;
+  background: var(--surface);
+}
+
+/* --- Top bar ------------------------------------------------------------ */
+
+#top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 2px;
+  background: var(--bar);
+  color: var(--bar-text);
+}
+
+#top a {
+  color: var(--bar-text);
+  text-decoration: none;
+}
+
+#top a.on {
+  color: #ffffff;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+}
+
+.mark {
+  flex: none;
+  color: #ffffff;
+}
+
+#updated {
+  margin-left: auto;
+  padding-right: 4px;
+  font-size: var(--fs-small);
+}
+
+/* --- Shared small print ------------------------------------------------- */
+
+main {
+  padding: var(--gutter) var(--gutter) 16px;
+}
+
+.sub,
+.count,
+.back {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.sub a,
+.back a {
+  color: var(--muted);
+}
+
+#status {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.lede {
+  max-width: 76ch;
+  margin: 4px 0 12px;
+  line-height: 1.5;
+}
+
+/* --- Charts ------------------------------------------------------------- */
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px 32px;
+  margin: 0 0 16px;
+}
+
+.chart {
+  min-width: 0;
+  margin: 0;
+}
+
+.chart figcaption {
+  margin-bottom: 4px;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: 132px;
+  overflow: visible;
+}
+
+/* Marks that answer to a finger: sideways drags read values, vertical ones scroll. */
+.chart svg,
+.strip,
+.calendar {
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.chart text {
+  fill: var(--muted);
+  font-size: var(--fs-chart);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart text.value {
+  fill: var(--text);
+}
+
+.chart .grid {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.chart .col {
+  fill: var(--mark);
+}
+
+.chart .col.at {
+  fill: var(--mark-on);
+}
+
+.tableview summary {
+  width: max-content;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.tableview .scroll {
+  max-height: 180px;
+  margin-top: 4px;
+  overflow: auto;
+}
+
+.tableview table {
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableview th,
+.tableview td {
+  padding: 1px 16px 1px 0;
+  font-weight: normal;
+  text-align: left;
+}
+
+.tableview td:last-child {
+  text-align: right;
+}
+
+/* --- Controls ----------------------------------------------------------- */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0 4px;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls input,
+.controls select {
+  padding: 2px 4px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  background: var(--page);
+  color: var(--text);
+  font: inherit;
+}
+
+.controls input {
+  width: 24ch;
+  max-width: 100%;
+}
+
+.sort {
+  color: var(--muted);
+}
+
+.sort a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sort a.on {
+  font-weight: bold;
+}
+
+.sort-pick {
+  display: none;
+}
+
+.count {
+  margin: 4px 0 8px;
+}
+
+/* --- Company list ------------------------------------------------------- */
+
+.items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.items th {
+  padding: 0 12px 6px 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: normal;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.items td {
+  padding: 0 12px 8px 0;
+  vertical-align: top;
+}
+
+.items .rank {
+  width: var(--rank);
+  padding-right: 6px;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.items .who {
+  width: 34%;
+  min-width: 14em;
+}
+
+.name {
+  text-decoration: none;
+}
+
+.now {
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 8px 0 8px var(--rank);
+  color: var(--muted);
+}
+
+.more {
+  margin: 4px 0 0 var(--rank);
+}
+
+.more a {
+  text-decoration: none;
+}
+
+/* The strip: one cell per thread, 9px wide with a 2px gap (262px for 24). */
+.strip {
+  display: inline-grid;
+  grid-template-columns: repeat(var(--cells, 24), 9px);
+  gap: 2px;
+  height: 14px;
+  margin-top: 1px;
+  vertical-align: top;
+}
+
+.strip i,
+.calendar i,
+.legend i {
+  display: block;
+  background: var(--cell-none);
+}
+
+.strip i.s1,
+.calendar i.s1,
+.legend i.s1 {
+  background: var(--s1);
+}
+
+.strip i.s2,
+.calendar i.s2,
+.legend i.s2 {
+  background: var(--s2);
+}
+
+.strip i.s3,
+.calendar i.s3,
+.legend i.s3 {
+  background: var(--s3);
+}
+
+/* A first post has nothing to be compared with: outlined, not filled. */
+.strip i.first,
+.calendar i.first,
+.legend i.first {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--s2);
+}
+
+/* The cell under the pointer or the finger. */
+.strip i.at,
+.calendar i.at {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.calendar i.off {
+  visibility: hidden;
+}
+
+.strip-head {
+  width: 274px;
+}
+
+.range {
+  display: flex;
+  justify-content: space-between;
+  width: 262px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.legend i {
+  width: 9px;
+  height: 9px;
+}
+
+/* --- Company page ------------------------------------------------------- */
+
+.back {
+  margin: 4px 0;
+}
+
+#view-company h1 {
+  margin: 8px 0 2px;
+  font-size: var(--fs-title);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+#view-company h1 .site {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: normal;
+}
+
+.facts {
+  margin: 8px 0;
+}
+
+.calendar-wrap {
+  margin: 12px 0 16px;
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: var(--rank) repeat(12, 14px);
+  gap: 2px;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.calendar i {
+  aspect-ratio: 1;
+}
+
+.calendar .month {
+  text-align: center;
+}
+
+.calendar .year {
+  padding-right: 6px;
+  text-align: right;
+}
+
+.calendar-wrap .legend {
+  margin: 6px 0 0;
+}
+
+.history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history li {
+  margin: 0 0 12px;
+}
+
+.history .when {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.history .when b {
+  color: var(--text);
+  font-weight: normal;
+}
+
+.history .facts-line {
+  max-width: 88ch;
+  overflow-wrap: anywhere;
+}
+
+.history .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.history .actions a,
+.history .actions button {
+  color: var(--muted);
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.diff {
+  max-width: 88ch;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--rule);
+  background: var(--page);
+  font-size: var(--fs-diff);
+  line-height: 1.5;
+}
+
+.diff .text {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.diff .text + .sub {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.diff ins {
+  background: var(--ins);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.diff del {
+  background: var(--del);
+  color: var(--del-text);
+}
+
+/* --- About -------------------------------------------------------------- */
+
+.prose {
+  max-width: 72ch;
+  line-height: 1.55;
+}
+
+.prose h1 {
+  margin: 8px 0;
+  font-size: var(--fs-title);
+}
+
+.prose h2 {
+  margin: 20px 0 4px;
+  font-size: var(--fs);
+}
+
+.prose p,
+.prose ul,
+.prose dl {
+  margin: 0 0 8px;
+}
+
+.prose ul {
+  padding-left: 20px;
+}
+
+.prose dt {
+  font-weight: bold;
+}
+
+.prose dd {
+  margin: 0 0 8px;
+}
+
+/* --- Footer and tooltip ------------------------------------------------- */
+
+#foot {
+  padding: 12px var(--gutter) calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 2px solid var(--bar);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  text-align: center;
+}
+
+#foot p {
+  margin: 4px 0 0;
+}
+
+#tip {
+  position: fixed;
+  z-index: 10;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 3px 6px;
+  border: 1px solid var(--muted);
+  background: var(--tip);
+  color: var(--text);
+  font-size: var(--fs-small);
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+#tip b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Hover, only where there is a pointer that can hover ---------------- */
+
+@media (hover: hover) {
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+/* --- Comfortable type and targets: phones, and any touch screen ---------- */
+
+@media (max-width: 820px), (pointer: coarse) {
+  :root {
+    --fs: 16px;
+    --fs-small: 13px;
+    --fs-title: 20px;
+    --fs-diff: 15px;
+    --fs-chart: 13px;
+    --gutter: 12px;
+    --rank: 2.4em;
+  }
+
+  body {
+    line-height: 1.4;
+  }
+
+  /* Anything meant to be tapped is at least 44px tall. */
+  #top nav a,
+  .brand,
+  .sort a,
+  .more a,
+  .back a,
+  .history .actions a,
+  .history .actions button,
+  .tableview summary,
+  #foot .links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  #top {
+    padding: 0 4px;
+  }
+
+  #top nav a {
+    padding: 0 6px;
+  }
+
+  .tableview summary {
+    display: flex;
+  }
+
+  .controls input,
+  .controls select {
+    min-height: 44px;
+    padding: 4px 10px;
+    font-size: 16px; /* below 16px iOS zooms the page when the field is focused */
+  }
+
+  .name {
+    display: inline-block;
+    padding: 4px 0 2px;
+  }
+
+  .items td {
+    padding-bottom: 12px;
+  }
+
+  .history li {
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .history .actions {
+    gap: 0 20px;
+  }
+
+  #tip {
+    padding: 6px 8px;
+  }
+}
+
+/* --- One column: phones and narrow tablets ------------------------------ */
+
+@media (max-width: 820px) {
+  body {
+    margin: 0;
+  }
+
+  #page {
+    width: 100%;
+    max-width: none;
+  }
+
+  main {
+    padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+    padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  }
+
+  /* Name and date on the first line, the views on a second one that scrolls sideways. */
+  #top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0;
+    padding: 0 max(4px, env(safe-area-inset-right, 0px)) 0 max(4px, env(safe-area-inset-left, 0px));
+  }
+
+  .brand {
+    padding: 0 8px;
+  }
+
+  #updated {
+    grid-row: 1;
+    grid-column: 2;
+    padding: 0 8px;
+  }
+
+  #top nav {
+    display: flex;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    overflow-x: auto;
+    border-top: 1px solid rgb(0 0 0 / 15%);
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+
+  #top nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  #top nav a {
+    padding: 0 10px;
+  }
+
+  #top nav .bar {
+    display: none;
+  }
+
+  /* The list is what people come for: on a phone it goes above the charts. */
+  #view-list:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #view-list .charts {
+    order: 1;
+    margin: 24px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .field {
+    display: flex;
+  }
+
+  .field span {
+    flex: none;
+    min-width: 4.2em;
+    color: var(--muted);
+  }
+
+  .controls input,
+  .controls select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .sort {
+    display: none;
+  }
+
+  .sort-pick {
+    display: flex;
+  }
+
+  .legend {
+    gap: 4px 12px;
+  }
+
+  /* Each company becomes a block: name, strip across the full width, numbers. */
+  .items,
+  .items thead,
+  .items tbody,
+  .items th,
+  .items td {
+    display: block;
+  }
+
+  .items thead tr {
+    display: block;
+    padding-left: var(--rank);
+  }
+
+  .items thead th:not(.strip-head) {
+    display: none;
+  }
+
+  .strip-head,
+  .range {
+    width: 100%;
+    max-width: 480px;
+    padding-right: 0;
+  }
+
+  .items tbody tr {
+    display: grid;
+    grid-template-columns: var(--rank) minmax(0, 1fr);
+    margin-bottom: 16px;
+  }
+
+  .items td,
+  .items td.who {
+    grid-column: 2;
+    width: auto;
+    min-width: 0;
+    padding: 0 0 4px;
+  }
+
+  .items td.rank {
+    grid-row: 1 / span 3;
+    grid-column: 1;
+    width: auto;
+    padding: 4px 6px 0 0;
+  }
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(var(--cells, 24), minmax(0, 1fr));
+    width: 100%;
+    max-width: 480px;
+    height: 20px;
+    margin: 2px 0;
+  }
+
+  .now {
+    white-space: normal;
+  }
+
+  .now .sub {
+    display: inline;
+    margin-left: 6px;
+  }
+
+  .empty {
+    padding-left: 0;
+  }
+
+  .more {
+    margin: 0;
+  }
+
+  .more a {
+    display: flex;
+    justify-content: center;
+    border: 1px solid var(--muted);
+  }
+
+  .calendar {
+    grid-template-columns: 2.8em repeat(12, minmax(0, 1fr));
+    gap: 3px;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .diff {
+    max-width: none;
+    padding: 12px;
+  }
+
+  .chart svg {
+    height: 150px;
+  }
+}
