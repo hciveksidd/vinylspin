@@ -1,0 +1,62 @@
+name: Build and publish
+
+# Rebuilds the data from HN once a day and publishes site/ to GitHub Pages.
+# Needs Pages enabled with "GitHub Actions" as the source (Settings > Pages).
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Optional. A way for the HN API operators to reach you, sent as part of
+      # the User-Agent. Set it under Settings > Variables > Actions.
+      STILL_HIRING_CONTACT: ${{ vars.STILL_HIRING_CONTACT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Closed threads never change, so they are downloaded once and kept.
+      - uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-threads-${{ github.run_id }}
+          restore-keys: raw-threads-
+      - run: python -m stillhiring fetch
+      - run: python -m stillhiring build
+      - name: Report
+        run: |
+          {
+            echo '```'
+            python -m stillhiring stats
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
