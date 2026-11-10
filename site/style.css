@@ -819,19 +819,6 @@ button.link {
     display: none;
   }
 
-  /* The list is what people come for: on a phone it goes above the charts. */
-  #view-list:not([hidden]) {
-    display: flex;
-    flex-direction: column;
-  }
-
-  #view-list .charts {
-    order: 1;
-    margin: 24px 0 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--rule);
-  }
-
   .controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
