@@ -640,6 +640,20 @@ button.link {
   margin: 4px 0 0;
 }
 
+#foot .author {
+  margin: 0 auto 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+#foot .author b {
+  color: var(--text);
+}
+
+#foot .contact a {
+  overflow-wrap: anywhere;
+}
+
 #tip {
   position: fixed;
   z-index: 10;
@@ -691,10 +705,18 @@ button.link {
   .history .actions a,
   .history .actions button,
   .tableview summary,
-  #foot .links a {
+  #foot .links a,
+  #foot .contact a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+
+  /* Links inside running text keep their line; the padding makes the target tall. */
+  .prose a[href^="mailto:"],
+  .prose a[href*="linkedin.com"] {
+    display: inline-block;
+    padding: 11px 0;
   }
 
   #top {
