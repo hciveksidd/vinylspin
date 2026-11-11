@@ -131,7 +131,12 @@ Pages. Before the first run:
 
 Scheduled workflows run from the default branch only.
 
-The PNG icons in `site/` are renders of `site/icon.svg`.
+The author and contact details (footer and "about" page) are plain markup in
+`site/index.html`.
+
+The PNG icons in `site/` are renders of `site/icon.svg`, and `site/og.png` (the link preview,
+1200×630) is a render of `site/og.svg`. The preview tags in `site/index.html` hold the site's
+absolute address; change them if the site moves.
 
 ## Data source
 

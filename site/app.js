@@ -149,10 +149,9 @@ function legend(lead) {
     lead ? el("span", {}, lead) : null,
     item("", "no post"),
     item("first", "first post"),
-    el("span", {}, "same text as the post before:"),
-    item("s1", "under 50%"),
-    item("s2", "50–89%"),
-    item("s3", "90% or more"),
+    item("s1", "rewritten"),
+    item("s2", "edited"),
+    item("s3", "same text"),
   ].filter(Boolean);
 }
 
@@ -160,7 +159,7 @@ function strip(row) {
   const posted = [...row.strip].filter((code) => code !== ".").length;
   const node = el("span", { className: "strip", role: "img" });
   node.style.setProperty("--cells", row.strip.length);
-  node.setAttribute("aria-label", `Posted in ${posted} of the last ${row.strip.length} threads`);
+  node.setAttribute("aria-label", `Posted in ${posted} of the last ${row.strip.length} months`);
   [...row.strip].forEach((code, offset) => {
     node.append(el("i", { className: cellClass(code), dataset: { offset } }));
   });
@@ -336,48 +335,93 @@ function columnChart(host, spec) {
   new ResizeObserver(draw).observe(svg);
 }
 
-function renderCharts() {
-  const threads = state.meta.threads;
-  const host = $("charts");
-  host.replaceChildren();
+/** A filled silhouette of a series, for a tile. Decorative: the tile states the number. */
+function sparkline(values, max) {
+  const step = 100 / (values.length - 1);
+  const points = values.map((value, i) => `${(i * step).toFixed(1)},${(22 - (20 * value) / max).toFixed(1)}`);
+  const svg = svgEl("svg", { class: "spark", viewBox: "0 0 100 22", preserveAspectRatio: "none", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: `M0,22L${points.join("L")}L100,22Z` }));
+  return svg;
+}
 
-  const posts = threads.map((thread, index) => ({
-    index,
-    value: thread.posts,
-    extra: companies(thread.companies),
-  }));
+/** The headline numbers. The two with a series open the full chart below when pressed. */
+function renderTiles() {
+  const { threads, totals } = state.meta;
+  const newest = threads.length - 1;
+  const posts = threads.map((thread, index) => ({ index, value: thread.posts, extra: companies(thread.companies) }));
   const peak = posts.reduce((best, point, position) => (point.value > posts[best].value ? position : best), 0);
-  columnChart(host, {
-    title: "Posts per thread",
-    note: "top-level comments in each monthly thread",
-    unit: "posts",
-    points: posts,
-    max: niceMax(posts[peak].value),
-    format: number,
-    annotate: [posts.length - 1, peak],
-  });
-
   const repeat = threads
     .map((thread, index) => ({ index, value: thread.repeat === null ? null : Math.round(thread.repeat * 100) }))
     .filter((point) => point.value !== null);
-  columnChart(host, {
-    title: "Also posted the month before",
-    note: "share of the companies in each thread",
-    unit: "share",
-    points: repeat,
-    max: 100,
-    format: (value) => `${value}%`,
-    annotate: [repeat.length - 1],
+  const charts = [
+    {
+      label: `Posts in ${monthLabel(newest)}`,
+      value: number(threads[newest].posts),
+      spec: {
+        title: "Posts per month",
+        note: "top-level comments in each monthly thread",
+        unit: "posts",
+        points: posts,
+        max: niceMax(posts[peak].value),
+        format: number,
+        annotate: [posts.length - 1, peak],
+      },
+    },
+    {
+      label: "Also posted the month before",
+      value: repeat.length ? `${repeat[repeat.length - 1].value}%` : "–",
+      spec: {
+        title: "Also posted the month before",
+        note: "share of the companies in each month's thread",
+        unit: "share",
+        points: repeat,
+        max: 100,
+        format: (value) => `${value}%`,
+        annotate: [repeat.length - 1],
+      },
+    },
+  ];
+
+  const panel = $("tile-panel");
+  let open = -1;
+  const buttons = charts.map((chart, position) => {
+    const button = el(
+      "button",
+      { className: "tile", type: "button", "aria-expanded": "false", "aria-controls": "tile-panel" },
+      el("span", { className: "label" }, chart.label, " ", el("span", { "aria-hidden": "true" }, "▾")),
+      el("span", { className: "value" }, chart.value),
+      sparkline(chart.spec.points.map((point) => point.value), chart.spec.max),
+    );
+    button.addEventListener("click", () => {
+      open = open === position ? -1 : position;
+      buttons.forEach((other, at) => other.setAttribute("aria-expanded", String(at === open)));
+      clearTip();
+      panel.replaceChildren();
+      panel.hidden = open < 0;
+      if (open >= 0) columnChart(panel, chart.spec);
+    });
+    return button;
   });
+  $("tiles").replaceChildren(
+    ...buttons,
+    el(
+      "div",
+      { className: "tile" },
+      el("span", { className: "label" }, `Companies since ${monthLabel(0)}`),
+      el("span", { className: "value" }, number(totals.companies)),
+      el("span", { className: "label" }, `${number(totals.posts)} posts`),
+    ),
+  );
 }
 
 // --- List ------------------------------------------------------------------
 
 const FILTERS = {
-  all: { sort: "run", test: () => true },
+  now: { sort: "run", test: (row) => row.run > 0 },
   same: { sort: "same", test: (row) => row.same >= state.meta.thresholds.long_run },
   stopped: { sort: "last", test: (row) => row.stopped >= state.meta.thresholds.stopped_min_run },
   new: { sort: "name", test: (row) => row.threads === 1 && row.first === state.meta.threads.length - 1 },
+  all: { sort: "run", test: () => true },
 };
 
 const byName = (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }) || (a.id < b.id ? -1 : 1);
@@ -391,39 +435,49 @@ const SORTS = {
 
 function listHash(list) {
   const params = new URLSearchParams();
-  if (list.filter !== "all") params.set("f", list.filter);
+  if (list.filter !== "now") params.set("f", list.filter);
   if (list.sort !== FILTERS[list.filter].sort) params.set("s", list.sort);
   if (list.query) params.set("q", list.query);
   const text = params.toString();
   return text ? `#${text}` : "#";
 }
 
-function nowCell(row) {
-  const cell = el("td", { className: "now" });
-  if (row.run > 0) {
-    if (row.run === 1 && row.threads === 1) cell.append("first post");
-    else cell.append(el("b", {}, String(row.run)), row.run === 1 ? " thread" : " in a row");
-    let small = "";
-    if (row.same >= 2) small = `same text ${row.same} in a row${row.avg === null ? "" : `, ${row.avg}% alike`}`;
-    else if (row.sim !== null) small = `${row.sim}% same as previous post`;
-    if (small) cell.append(el("div", { className: "sub" }, small));
-  } else {
-    cell.append(`last ${monthLabel(row.last)}`);
-    if (row.stopped >= 2) cell.append(el("div", { className: "sub" }, `after ${row.stopped} in a row`));
+/** How a company stands now, in words: {num, unit, note}. Used by the list and the company page. */
+function standing(row) {
+  if (row.run === 0) {
+    return {
+      num: "",
+      unit: `last ${monthLabel(row.last)}`,
+      note: row.stopped >= 2 ? `after ${row.stopped} months in a row` : "",
+    };
   }
+  let unit = "months in a row";
+  if (row.run === 1) unit = row.threads === 1 ? "month, first post" : "month";
+  let note = "";
+  if (row.same >= 2) note = `same text for the last ${row.same}`;
+  else if (row.sim !== null) note = `text changed last time (${row.sim}% same)`;
+  return { num: String(row.run), unit, note };
+}
+
+function nowCell(row) {
+  const { num, unit, note } = standing(row);
+  const big = el("div", { className: "big" });
+  if (num) big.append(el("span", { className: "num" }, num), " ");
+  big.append(el("span", { className: "unit" }, unit));
+  const cell = el("td", { className: "now" }, big);
+  if (note) cell.append(el("div", { className: "sub" }, note));
   return cell;
 }
 
-function listRow(row, rank) {
+function listRow(row) {
   const total = state.meta.threads.length;
   const where =
     row.threads === 1
-      ? `1 thread · ${monthLabel(row.first)}`
-      : `in ${row.threads} of ${total} threads · since ${monthLabel(row.first)}`;
+      ? `one post · ${monthLabel(row.first)}`
+      : `since ${monthLabel(row.first)} · in ${row.threads} of ${total} months`;
   return el(
     "tr",
     { dataset: { id: row.id } },
-    el("td", { className: "rank" }, `${rank}.`),
     el(
       "td",
       { className: "who" },
@@ -439,12 +493,13 @@ function countLine(count, list) {
   const { thresholds, threads } = state.meta;
   const newest = monthLabel(threads.length - 1);
   const about = {
-    all: "",
-    same: ` whose last ${thresholds.long_run} or more posts in a row were at least ${percent(thresholds.same_text)} the same text`,
-    stopped: ` that posted ${thresholds.stopped_min_run} or more threads in a row and are not in ${newest}`,
-    new: ` whose first post is in ${newest}`,
+    now: " posting now",
+    same: ` have posted nearly the same text ${thresholds.long_run} or more months in a row`,
+    stopped: ` posted ${thresholds.stopped_min_run} or more months in a row and are not in ${newest}`,
+    new: ` posted for the first time in ${newest}`,
+    all: ` since ${monthLabel(0)}`,
   }[list.filter];
-  return `${companies(count)}${about}${list.query ? ` matching “${list.query}”` : ""}`;
+  return `${companies(count)}${about}${list.query ? `, matching “${list.query}”` : ""}`;
 }
 
 function renderList() {
@@ -457,18 +512,19 @@ function renderList() {
   const shown = rows.slice(0, list.pages * PAGE_SIZE);
   const body = $("rows");
   clearTip();
-  body.replaceChildren(...shown.map((row, index) => listRow(row, index + 1)));
+  body.replaceChildren(...shown.map(listRow));
   if (!rows.length) {
-    body.append(el("tr", {}, el("td", { className: "empty", colSpan: 4 }, "Nothing matches.")));
+    body.append(el("tr", { className: "empty-row" }, el("td", { className: "empty", colSpan: 3 }, "Nothing matches.")));
   }
   $("count").textContent = countLine(rows.length, list);
   $("more").parentElement.hidden = shown.length >= rows.length;
+  $("more").textContent = `More (${number(rows.length - shown.length)} left)`;
   document.querySelectorAll("#sort a").forEach((link) => {
-    link.classList.toggle("on", link.dataset.sort === list.sort);
-    if (link.dataset.sort === list.sort) link.setAttribute("aria-current", "true");
+    const on = link.dataset.sort === list.sort;
+    link.classList.toggle("on", on);
+    if (on) link.setAttribute("aria-current", "true");
     else link.removeAttribute("aria-current");
   });
-  $("sort-select").value = list.sort;
   if ($("q").value !== list.query) $("q").value = list.query;
 }
 
@@ -477,33 +533,63 @@ function updateList(change) {
   state.list = { ...state.list, ...change, pages: 1 };
   history.replaceState(null, "", listHash(state.list));
   state.lastListHash = location.hash;
+  markFilter(state.list.filter);
   renderList();
+}
+
+function markFilter(current) {
+  document.querySelectorAll("#filters a").forEach((link) => {
+    const on = link.dataset.view === current;
+    link.classList.toggle("on", on);
+    if (on) {
+      link.setAttribute("aria-current", "page");
+      link.scrollIntoView({ block: "nearest", inline: "nearest" }); // the row of filters scrolls on a phone
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+}
+
+/** Grey bars where the rows will be, while the company list downloads. */
+function showSkeleton() {
+  const bar = (width) => el("div", { style: `width:${width}%` });
+  $("rows").replaceChildren(
+    ...[62, 48, 70, 55, 66, 44].map((width) =>
+      el("tr", { className: "skeleton" }, el("td", { colSpan: 3 }, bar(width), bar(100), bar(width / 2))),
+    ),
+  );
+  $("count").textContent = "Loading companies…";
+  $("more").parentElement.hidden = true;
 }
 
 function setupList() {
   const { threads, strip_len: stripLength } = state.meta;
   $("strip-from").textContent = monthLabel(Math.max(0, threads.length - stripLength));
   $("strip-to").textContent = monthLabel(threads.length - 1);
-  $("legend").replaceChildren(...legend(`last ${stripLength} threads:`));
 
-  const newest = threads[threads.length - 1];
-  const totals = state.meta.totals;
-  let lede =
-    `${number(totals.threads)} monthly threads since ${monthLabel(0)}: ${number(totals.posts)} posts ` +
-    `from ${number(totals.companies)} companies. `;
-  lede += `${monthLabel(threads.length - 1)}${newest.open ? " (still filling up)" : ""} has ${number(newest.posts)} posts`;
-  if (newest.repeat !== null) {
-    lede +=
-      `; ${percent(newest.repeat)} of its companies also posted the month before` +
-      (newest.same === null ? "" : `, ${percent(newest.same)} with nearly the same text`);
+  // The strips answer to a finger or a mouse, which nothing on screen gives away:
+  // say so until the visitor has done it once.
+  const hint = el("span", { id: "hint" }, "· touch or hover a square for its month");
+  $("legend").replaceChildren(...legend(`last ${stripLength} months:`), hint);
+  try {
+    hint.hidden = localStorage.getItem("strip-hint") === "seen";
+  } catch {
+    // Storage can be blocked; the hint then simply stays.
   }
-  $("lede").textContent = `${lede}. The counts show who posted, not who is hiring.`;
-  renderCharts();
+
+  document.querySelectorAll("#filters a").forEach((link) => {
+    link.querySelector("span").textContent = number(state.rows.filter(FILTERS[link.dataset.view].test).length);
+  });
 
   let timer = 0;
   $("q").addEventListener("input", (event) => {
     clearTimeout(timer);
-    timer = setTimeout(() => updateList({ query: event.target.value }), 120);
+    timer = setTimeout(() => {
+      const query = event.target.value;
+      // A search looks through every company, not only the ones posting now.
+      const filter = query && state.list.filter === "now" ? "all" : state.list.filter;
+      updateList({ query, filter });
+    }, 120);
   });
   $("controls").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -515,11 +601,17 @@ function setupList() {
     event.preventDefault();
     updateList({ sort: link.dataset.sort });
   });
-  $("sort-select").addEventListener("change", (event) => updateList({ sort: event.target.value }));
   $("more").addEventListener("click", (event) => {
     event.preventDefault();
     state.list.pages += 1;
     renderList();
+  });
+
+  // The whole row opens the company, except the strip, which shows months.
+  $("rows").addEventListener("click", (event) => {
+    if (event.target.closest("a, .strip")) return;
+    const row = event.target.closest("tr[data-id]");
+    if (row) location.hash = `c=${encodeURIComponent(row.dataset.id)}`;
   });
 
   // One listener serves every strip in the list.
@@ -529,6 +621,15 @@ function setupList() {
     const row = state.byId.get(cell.closest("tr").dataset.id);
     const offset = Number(cell.dataset.offset);
     const index = threads.length - row.strip.length + offset;
+    if (!hint.hidden && hint.style.visibility !== "hidden") {
+      // Hidden without giving up its space: the rows must not move under the finger.
+      hint.style.visibility = "hidden";
+      try {
+        localStorage.setItem("strip-hint", "seen");
+      } catch {
+        // Not remembered, then.
+      }
+    }
     return {
       node: cell,
       anchor: cell.getBoundingClientRect(),
@@ -624,6 +725,12 @@ async function renderDiff(panel, current, previous, previousLabel) {
     // A company can post several times in a thread: compare with the closest earlier post.
     const base = earlier.reduce((best, other) => (similarity(other, text) > similarity(best, text) ? other : best));
     const result = diffWords(base, text);
+    const which = later.length > 1 ? `Post ${position + 1}: ` : "";
+    const against = earlier.length > 1 ? `closest ${previousLabel} post` : `${previousLabel} post`;
+    if (result.parts.every((part) => part.type === "same")) {
+      panel.append(el("div", { className: "sub" }, `${which}No changes: word for word the same as the ${against}.`));
+      return;
+    }
     const body = el("p", { className: "text" });
     result.parts.forEach((part, at) => {
       if (part.type === "same") return body.append(part.text);
@@ -632,8 +739,6 @@ async function renderDiff(panel, current, previous, previousLabel) {
       if (part.type === "ins" && before?.type === "del" && !/\s$/.test(before.text)) body.append(" ");
       body.append(el(part.type, {}, part.text));
     });
-    const which = later.length > 1 ? `Post ${position + 1}: ` : "";
-    const against = earlier.length > 1 ? `closest ${previousLabel} post` : `${previousLabel} post`;
     panel.append(
       el(
         "div",
@@ -653,7 +758,7 @@ function calendar(detail, row) {
   const cells = new Map(detail.t.map((entry) => [entry[0], entry]));
   const indexOf = new Map(threads.map((thread, index) => [thread.m, index]));
   const grid = el("div", { className: "calendar", role: "img" });
-  grid.setAttribute("aria-label", `Posted in ${row.threads} of ${threads.length} threads. The list below has every post.`);
+  grid.setAttribute("aria-label", `Posted in ${row.threads} of ${threads.length} months. The list below has every post.`);
   grid.append(el("span"));
   for (const month of MONTHS) grid.append(el("span", { className: "month", "aria-hidden": "true" }, month[0]));
   const firstYear = Number(threads[0].m.slice(0, 4));
@@ -672,6 +777,8 @@ function calendar(detail, row) {
       grid.append(el("i", { className: cls, dataset: { index } }));
     }
   }
+  // The caption repeats what the tooltip says, so the month stays readable after the finger lifts.
+  const caption = el("p", { className: "cal-caption sub" }, "Touch or hover a square to see the month.");
   tipsOn(grid, (event) => {
     const cell = under(event, ".calendar i[data-index]");
     if (!cell || !grid.contains(cell)) return null;
@@ -679,19 +786,25 @@ function calendar(detail, row) {
     const entry = cells.get(index);
     let text = "no post";
     if (entry) text = entry[2] === null ? "first post" : `${entry[2]}% the same as the previous post`;
+    caption.textContent = `${monthLabel(index)}: ${text}`;
     return { node: cell, anchor: cell.getBoundingClientRect(), strong: monthLabel(index), rest: text };
   });
-  return el("div", { className: "calendar-wrap" }, grid, el("div", { className: "legend" }, ...legend()));
+  return el("div", { className: "calendar-wrap" }, grid, caption, el("div", { className: "legend" }, ...legend()));
+}
+
+/** Roles, place and pay of one month, as one line of text. */
+function factsLine(entry) {
+  const [, , , roles, location, remote, pay] = entry;
+  const policy = remote && !new RegExp(remote, "i").test(location ?? "") ? remote : "";
+  return [roles.join(", "), location, policy, pay].filter(Boolean).join(" · ");
 }
 
 function historyItem(entry, previous) {
-  const [index, ids, similar, roles, location, remote, pay] = entry;
+  const [index, ids, similar] = entry;
   let compared = "first post";
   if (previous) compared = similar === null ? "not compared" : `${similar}% the same as ${monthLabel(previous[0])}`;
   const item = el("li", {}, el("div", { className: "when" }, el("b", {}, monthLabel(index)), ` · ${compared}`));
-
-  const policy = remote && !new RegExp(remote, "i").test(location ?? "") ? remote : "";
-  const line = [roles.join(", "), location, policy, pay].filter(Boolean).join(" · ");
+  const line = factsLine(entry);
   if (line) item.append(el("div", { className: "facts-line" }, line));
 
   const actions = el("div", { className: "actions" });
@@ -721,6 +834,78 @@ function historyItem(entry, previous) {
   return item;
 }
 
+/** Several months in a row with the same text and roles, folded into one entry. */
+function historyRun(entries, from, to) {
+  const count = to - from + 1;
+  const item = el(
+    "li",
+    { className: "run" },
+    el(
+      "div",
+      { className: "when" },
+      el("b", {}, `${monthLabel(entries[from][0])} – ${monthLabel(entries[to][0])}`),
+      ` · ${count} months, same text as ${monthLabel(entries[from - 1][0])}`,
+    ),
+  );
+  const line = factsLine(entries[to]);
+  if (line) item.append(el("div", { className: "facts-line" }, line));
+  const inner = el("ol", { className: "history", reversed: true, hidden: true });
+  const label = `show all ${count}`;
+  const button = el("button", { className: "link", type: "button", "aria-expanded": "false" }, label);
+  button.addEventListener("click", () => {
+    if (!inner.childElementCount) {
+      for (let at = to; at >= from; at--) inner.append(historyItem(entries[at], entries[at - 1]));
+    }
+    inner.hidden = !inner.hidden;
+    button.setAttribute("aria-expanded", String(!inner.hidden));
+    button.textContent = inner.hidden ? label : "show fewer";
+  });
+  item.append(el("div", { className: "actions" }, button), inner);
+  return item;
+}
+
+function historyList(detail) {
+  const entries = detail.t;
+  const same = Math.round(state.meta.thresholds.same_text * 100);
+  const repeats = (at) =>
+    entries[at][2] !== null &&
+    entries[at][2] >= same &&
+    entries[at][0] === entries[at - 1][0] + 1 &&
+    entries[at][3].join("|") === entries[at - 1][3].join("|");
+  const items = [];
+  let at = 0;
+  while (at < entries.length) {
+    let end = at + 1;
+    while (end < entries.length && repeats(end)) end++;
+    // entries[at] starts a stretch; at+1 .. end-1 repeat it.
+    items.push(historyItem(entries[at], at ? entries[at - 1] : null));
+    if (end - 1 - at >= 3) items.push(historyRun(entries, at + 1, end - 1));
+    else for (let one = at + 1; one < end; one++) items.push(historyItem(entries[one], entries[one - 1]));
+    at = end;
+  }
+  return el("ol", { className: "history", reversed: true }, ...items.reverse());
+}
+
+function shareButton() {
+  const button = el("button", { className: "chip", type: "button" }, "Share");
+  button.addEventListener("click", async () => {
+    const url = location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: document.title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      button.textContent = "Link copied";
+    } catch (error) {
+      if (error?.name === "AbortError") return; // the share sheet was closed
+      button.textContent = "Copy the address bar";
+    }
+    setTimeout(() => (button.textContent = "Share"), 2500);
+  });
+  return button;
+}
+
 async function renderCompany(id) {
   const view = $("view-company");
   const row = state.byId.get(id);
@@ -743,51 +928,36 @@ async function renderCompany(id) {
   }
 
   const total = state.meta.threads.length;
-  const title = el("h1", {}, detail.n);
-  const sites = detail.d.filter((domain) => /^[a-z0-9.-]+$/.test(domain)).slice(0, 2);
-  if (sites.length) {
-    const list = el("span", { className: "site" }, " (");
-    sites.forEach((domain, position) => {
-      if (position) list.append(", ");
-      list.append(el("a", { href: `https://${domain}`, rel: "noopener" }, domain));
-    });
-    list.append(")");
-    title.append(list);
-  }
+  const { num, unit, note } = standing(row);
+  const hero = el("div", { className: "hero" });
+  if (num) hero.append(el("span", { className: "num" }, num));
+  hero.append(el("span", {}, num ? unit : `Not in ${monthLabel(total - 1)}, ${unit}`));
 
-  const facts = el("p", { className: "facts" });
-  if (row.run > 0) {
-    facts.append(el("b", {}, String(row.run)), ` ${row.run === 1 ? "thread" : "threads in a row"} up to ${monthLabel(row.last)}.`);
-    if (row.same >= 2) {
-      facts.append(" The last ", el("b", {}, String(row.same)), " carried nearly the same text");
-      facts.append(row.avg === null ? "." : ` (${row.avg}% alike on average).`);
-    }
-  } else {
-    facts.append(`Not in ${monthLabel(total - 1)}. Last posted in ${monthLabel(row.last)}`);
-    facts.append(row.stopped >= 2 ? `, after ${row.stopped} threads in a row.` : ".");
+  const facts = [note, row.longest > row.run && row.longest > row.stopped ? `longest run: ${row.longest} months` : ""];
+  const actions = el("div", { className: "company-actions" });
+  for (const domain of detail.d.filter((name) => /^[a-z0-9.-]+$/.test(name)).slice(0, 2)) {
+    actions.append(el("a", { className: "chip", href: `https://${domain}`, rel: "noopener" }, domain));
   }
-  if (row.longest > row.run && row.longest > row.stopped) facts.append(` Longest run: ${row.longest}.`);
+  actions.append(shareButton());
 
   const header = [
     back,
-    title,
+    el("h1", {}, detail.n),
     el(
       "p",
       { className: "sub" },
-      `in ${row.threads} of ${total} threads · first ${monthLabel(row.first)} · last ${monthLabel(row.last)}`,
+      `since ${monthLabel(row.first)} · in ${row.threads} of ${total} months · last ${monthLabel(row.last)}`,
     ),
-    facts,
+    hero,
   ];
+  const line = facts.filter(Boolean).join(" · ");
+  if (line) header.push(el("p", { className: "facts sub" }, line));
+  header.push(actions);
   if (detail.names.length > 1) {
     const spellings = detail.names.map(([spelling, count]) => `${spelling} (${count})`).join(", ");
     header.push(el("p", { className: "sub" }, `Written as: ${spellings}`));
   }
-
-  const history = el("ol", { className: "history", reversed: true });
-  for (let position = detail.t.length - 1; position >= 0; position--) {
-    history.append(historyItem(detail.t[position], position ? detail.t[position - 1] : null));
-  }
-  view.replaceChildren(...header, calendar(detail, row), history);
+  view.replaceChildren(...header, calendar(detail, row), historyList(detail));
 }
 
 // --- Routing ---------------------------------------------------------------
@@ -797,50 +967,37 @@ function show(name) {
   clearTip();
 }
 
-function markNav(current) {
-  document.querySelectorAll("#top nav a").forEach((link) => {
-    const on = link.dataset.view === current;
-    link.classList.toggle("on", on);
-    if (on) {
-      link.setAttribute("aria-current", "page");
-      link.scrollIntoView({ block: "nearest", inline: "nearest" }); // the row of views scrolls on a phone
-    } else {
-      link.removeAttribute("aria-current");
-    }
-  });
-}
-
 function route() {
   const hash = location.hash;
   const raw = hash.slice(1);
   if (!$("view-list").hidden) {
     state.remembered.set(state.lastListHash, { pages: state.list.pages, scroll: window.scrollY });
   }
+  const about = document.querySelector('#top a[data-view="about"]');
+  about.classList.toggle("on", raw === "about");
 
   if (raw === "about") {
     document.title = "About – Still Hiring?";
-    markNav("about");
     show("about");
     window.scrollTo(0, 0);
     return;
   }
   const params = new URLSearchParams(raw);
   if (params.has("c")) {
-    markNav("");
     show("company");
     window.scrollTo(0, 0);
     renderCompany(params.get("c"));
     return;
   }
 
-  const filter = params.get("f") in FILTERS ? params.get("f") : "all";
+  const filter = params.get("f") in FILTERS ? params.get("f") : "now";
   const sort = params.get("s") in SORTS ? params.get("s") : FILTERS[filter].sort;
   const remembered = state.remembered.get(hash);
   state.list = { filter, sort, query: params.get("q") ?? "", pages: remembered?.pages ?? 1 };
   state.lastListHash = hash;
   document.title = "Still Hiring? – who keeps posting in HN “Who is hiring?”";
-  markNav(filter);
   show("list");
+  markFilter(filter);
   renderList();
   window.scrollTo(0, remembered?.scroll ?? 0);
 }
@@ -872,29 +1029,53 @@ function setupAbout() {
   }
 }
 
+async function load(path) {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+  return response.json();
+}
+
+function failed(error) {
+  $("status").hidden = false;
+  $("status").textContent =
+    "Could not load the data. If you are running this yourself, build it first: python -m stillhiring build";
+  $("view-list").hidden = true;
+  console.error(error);
+}
+
 async function start() {
+  // The small file first: the headline numbers show while the company list downloads.
+  const pending = load("data/companies.json");
+  pending.catch(() => {}); // reported below, once awaited
   try {
-    const [meta, companyData] = await Promise.all(
-      ["data/meta.json", "data/companies.json"].map(async (path) => {
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
-        return response.json();
-      }),
-    );
-    state.meta = meta;
-    state.rows = companyData.rows.map((values) => Object.fromEntries(meta.columns.map((name, i) => [name, values[i]])));
-    state.byId = new Map(state.rows.map((row) => [row.id, row]));
+    state.meta = await load("data/meta.json");
   } catch (error) {
-    $("status").textContent =
-      "Could not load the data. If you are running this yourself, build it first: python -m stillhiring build";
-    console.error(error);
-    return;
+    return failed(error);
   }
   $("status").hidden = true;
   const built = new Date(state.meta.built_at);
-  $("updated").textContent = `updated ${built.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
-  setupList();
+  $("updated").textContent = `updated ${built.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+  renderTiles();
   setupAbout();
+  const raw = location.hash.slice(1);
+  if (raw !== "about" && !new URLSearchParams(raw).has("c")) {
+    showSkeleton();
+    show("list");
+  }
+  $("to-contact").addEventListener("click", (event) => {
+    event.preventDefault();
+    $("foot").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  try {
+    const { rows } = await pending;
+    const columns = state.meta.columns;
+    state.rows = rows.map((values) => Object.fromEntries(columns.map((name, i) => [name, values[i]])));
+    state.byId = new Map(state.rows.map((row) => [row.id, row]));
+  } catch (error) {
+    return failed(error);
+  }
+  setupList();
   window.addEventListener("hashchange", route);
   // A tooltip opened by touch stays until the finger goes elsewhere or the page moves.
   window.addEventListener("scroll", clearTip, { passive: true });
