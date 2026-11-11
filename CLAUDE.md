@@ -31,6 +31,9 @@ JSON for a static site (`site/`, no build step, no dependencies).
    `textContent` or text nodes. No `innerHTML`.
 8. **The site must work on a phone.** Tap targets are at least 44px, text at least 13px,
    no horizontal scroll at 320px, and nothing is available on hover only.
+   The first company must be visible without scrolling on a 390×844 screen, and nothing
+   may move under a finger between touch and release (a shifted row turns a touch on a
+   strip into a tap on the row).
 9. **Be polite to the API.** Requests are sequential and rate-limited; closed threads are
    fetched once. Do not add parallel fetching.
 

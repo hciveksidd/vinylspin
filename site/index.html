@@ -36,10 +36,10 @@
       <svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M18.05 17.08A7.9 7.9 0 1 1 19.5 9.5M19.5 4.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <b>Still Hiring?</b>
     </a>
-    <nav aria-label="Views">
-      <a href="#" data-view="all">all</a><span class="bar" aria-hidden="true"> | </span><a href="#f=same" data-view="same">same text</a><span class="bar" aria-hidden="true"> | </span><a href="#f=stopped" data-view="stopped">stopped</a><span class="bar" aria-hidden="true"> | </span><a href="#f=new" data-view="new">new</a><span class="bar" aria-hidden="true"> | </span><a href="#about" data-view="about">about</a>
-    </nav>
     <span id="updated"></span>
+    <nav aria-label="Site">
+      <a href="#about" data-view="about">about</a>
+    </nav>
   </header>
 
   <main id="main">
@@ -47,35 +47,35 @@
     <noscript><p>This page needs JavaScript to load its data.</p></noscript>
 
     <section id="view-list" hidden>
-      <p class="lede" id="lede"></p>
-      <div class="charts" id="charts"></div>
-      <form class="controls" id="controls" role="search">
-        <label class="field" for="q"><span>search</span>
-          <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="company name">
-        </label>
-        <span class="sort" id="sort">sort:
-          <a href="#" data-sort="run">in a row</a> |
-          <a href="#" data-sort="same">same text</a> |
-          <a href="#" data-sort="threads">threads</a> |
-          <a href="#" data-sort="last">last seen</a> |
-          <a href="#" data-sort="name">name</a>
-        </span>
-        <label class="field sort-pick" for="sort-select"><span>sort by</span>
-          <select id="sort-select">
-            <option value="run">in a row</option>
-            <option value="same">same text</option>
-            <option value="threads">threads</option>
-            <option value="last">last seen</option>
-            <option value="name">name</option>
-          </select>
-        </label>
-      </form>
+      <div class="tiles" id="tiles"></div>
+      <div class="tile-panel" id="tile-panel" hidden></div>
+      <p class="byline">Made by a talent sourcing wizard. <a href="#" id="to-contact">Hit me up</a></p>
+
+      <div class="toolbar" id="toolbar">
+        <form class="controls" id="controls" role="search">
+          <label class="visually-hidden" for="q">Search companies</label>
+          <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search companies">
+        </form>
+        <nav class="chips" id="filters" aria-label="Show">
+          <a href="#" data-view="now">Posting now <span></span></a>
+          <a href="#f=same" data-view="same">Same text <span></span></a>
+          <a href="#f=stopped" data-view="stopped">Went quiet <span></span></a>
+          <a href="#f=new" data-view="new">New this month <span></span></a>
+          <a href="#f=all" data-view="all">All <span></span></a>
+        </nav>
+      </div>
       <p class="count" id="count"></p>
+      <div class="sort" id="sort"><span>Sort</span>
+        <a href="#" data-sort="run">in a row</a>
+        <a href="#" data-sort="same">same text</a>
+        <a href="#" data-sort="threads">months</a>
+        <a href="#" data-sort="last">last seen</a>
+        <a href="#" data-sort="name">name</a>
+      </div>
       <div class="legend" id="legend"></div>
       <table class="items" id="items">
         <thead>
           <tr>
-            <th class="rank" scope="col"><span class="visually-hidden">Rank</span></th>
             <th scope="col">company</th>
             <th class="strip-head" scope="col">
               <span class="range"><span id="strip-from"></span><span id="strip-to"></span></span>
@@ -96,16 +96,16 @@
 
       <h2>The numbers</h2>
       <dl>
-        <dt>in a row</dt>
+        <dt>months in a row</dt>
         <dd>Consecutive monthly threads with at least one post from the company, counting back from the newest thread. For the first <span data-meta="open-days">7</span> days of a new thread, a company that has not posted in it yet keeps its run.</dd>
         <dt>similarity</dt>
         <dd>The share of words a post has in common, in the same order, with the company's previous post. Links count as one word. When a company posts several times in one thread, each post is compared with the earlier post it resembles most.</dd>
         <dt>same text</dt>
-        <dd>How many of the threads in a run, counting back from the newest, carried nearly the same post: at least <span data-meta="same-text">90</span>% similar to the month before. The “same text” view lists companies at <span data-meta="long-run">6</span> or more.</dd>
-        <dt>stopped</dt>
+        <dd>How many of the threads in a run, counting back from the newest, carried nearly the same post: at least <span data-meta="same-text">90</span>% similar to the month before. The “Same text” filter lists companies at <span data-meta="long-run">6</span> or more.</dd>
+        <dt>went quiet</dt>
         <dd>The company posted <span data-meta="stopped-run">4</span> or more threads in a row and is not in the newest one.</dd>
         <dt>the strip</dt>
-        <dd>The last <span data-meta="strip-len">24</span> threads, newest on the right. An empty cell means no post, an outlined cell is the company's first post, and a filled cell gets darker the more it repeats the previous post.</dd>
+        <dd>The last <span data-meta="strip-len">24</span> months, newest on the right. Touch or hover a square to see which month it is. An empty cell means no post, an outlined cell is the company's first post, and a filled cell gets darker the more it repeats the previous post.</dd>
       </dl>
 
       <h2>What the numbers do not say</h2>
